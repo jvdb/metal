@@ -79,8 +79,6 @@
     <maven-project-info-reports.version>3.6.1</maven-project-info-reports.version>
     <maven-surefire-plugin.version>3.3.0</maven-surefire-plugin.version>
 
-    <sonar.organization>parsingdata</sonar.organization>
-    <sonar.host.url>https://sonarcloud.io</sonar.host.url>
   </properties>
 
   <profiles>
