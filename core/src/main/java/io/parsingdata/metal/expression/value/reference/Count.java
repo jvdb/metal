@@ -46,7 +46,7 @@ public class Count extends ImmutableObject implements SingleValueExpression {
 
     @Override
     public Optional<Value> evalSingle(final ParseState parseState, final Encoding encoding) {
-        return Optional.of(fromNumeric(operand.eval(parseState, encoding).size));
+        return Optional.of(fromNumeric(operand.eval(parseState, encoding).size()));
     }
 
     private static Value fromNumeric(final long length) {

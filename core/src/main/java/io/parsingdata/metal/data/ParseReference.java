@@ -42,7 +42,7 @@ public class ParseReference extends ImmutableObject implements ParseItem {
     }
 
     public Optional<ParseItem> resolve(final ParseGraph root) {
-        return findItemAtOffset(getAllRoots(root, definition), location, source).computeResult();
+        return findItemAtOffset(getAllRoots(root, definition), location, source);
     }
 
     @Override public boolean isReference() { return true; }

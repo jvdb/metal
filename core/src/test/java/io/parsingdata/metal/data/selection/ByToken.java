@@ -19,7 +19,8 @@ package io.parsingdata.metal.data.selection;
 
 import static io.parsingdata.metal.Util.checkNotNull;
 
-import io.parsingdata.metal.data.ImmutableList;
+import java.util.ArrayList;
+import java.util.List;
 import io.parsingdata.metal.data.ParseGraph;
 import io.parsingdata.metal.data.ParseItem;
 import io.parsingdata.metal.token.Token;
@@ -50,28 +51,29 @@ public final class ByToken {
         return get(graph.tail, definition);
     }
 
-    public static ImmutableList<ParseItem> getAll(final ParseGraph graph, final Token definition) {
+    public static List<ParseItem> getAll(final ParseGraph graph, final Token definition) {
         checkNotNull(graph, "graph");
         checkNotNull(definition, "definition");
         return getAllRecursive(graph, definition);
     }
 
-    private static ImmutableList<ParseItem> getAllRecursive(final ParseGraph graph, final Token definition) {
+    private static List<ParseItem> getAllRecursive(final ParseGraph graph, final Token definition) {
         if (graph.isEmpty()) {
-            return new ImmutableList<>();
+            return List.of();
         }
-        final ImmutableList<ParseItem> tailResults = getAllRecursive(graph.tail, definition);
-        final ImmutableList<ParseItem> results = graph.definition.equals(definition) ? tailResults.add(graph) : tailResults;
+        final List<ParseItem> results = new ArrayList<>();
         final ParseItem head = graph.head;
         if (head.isValue() && head.asValue().definition.equals(definition)) {
-            return results.add(head);
+            results.add(head);
+        } else if (head.isReference() && head.asReference().definition.equals(definition)) {
+            results.add(head);
+        } else if (head.isGraph()) {
+            results.addAll(getAllRecursive(head.asGraph(), definition));
         }
-        if (head.isReference() && head.asReference().definition.equals(definition)) {
-            return results.add(head);
+        if (graph.definition.equals(definition)) {
+            results.add(graph);
         }
-        if (head.isGraph()) {
-            return results.add(getAllRecursive(head.asGraph(), definition));
-        }
+        results.addAll(getAllRecursive(graph.tail, definition));
         return results;
     }
 

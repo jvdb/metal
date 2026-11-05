@@ -17,22 +17,18 @@
 
 package io.parsingdata.metal.expression.value.reference;
 
-import static java.math.BigInteger.ONE;
 import static java.math.BigInteger.ZERO;
+import static java.util.stream.Collectors.toUnmodifiableList;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
-import static io.parsingdata.metal.data.Selection.reverse;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Objects;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 import io.parsingdata.metal.expression.value.NotAValue;
@@ -61,27 +57,15 @@ public class Nth extends ImmutableObject implements ValueExpression {
     }
 
     @Override
-    public ImmutableList<Value> eval(final ParseState parseState, final Encoding encoding) {
-        return reverse(eval(values.eval(parseState, encoding), indices.eval(parseState, encoding), new ImmutableList<>()).computeResult());
-    }
-
-    private Trampoline<ImmutableList<Value>> eval(final ImmutableList<Value> values, final ImmutableList<Value> indices, final ImmutableList<Value> result) {
-        if (indices.isEmpty()) {
-            return complete(() -> result);
-        }
-        final BigInteger valueCount = BigInteger.valueOf(values.size);
-        final Value index = indices.head;
-        final Value nextResult = !index.equals(NOT_A_VALUE) && index.asNumeric().compareTo(valueCount) < 0 && index.asNumeric().compareTo(ZERO) >= 0
-            ? nth(values, valueCount.subtract(index.asNumeric()).subtract(ONE)).computeResult()
-            : NOT_A_VALUE;
-        return intermediate(() -> eval(values, indices.tail, result.add(nextResult)));
-    }
-
-    private Trampoline<Value> nth(final ImmutableList<Value> values, final BigInteger index) {
-        if (index.equals(ZERO)) {
-            return complete(() -> values.head);
-        }
-        return intermediate(() -> nth(values.tail, index.subtract(ONE)));
+    public List<Value> eval(final ParseState parseState, final Encoding encoding) {
+        final List<Value> valueList = values.eval(parseState, encoding);
+        final BigInteger valueCount = BigInteger.valueOf(valueList.size());
+        return indices.eval(parseState, encoding).stream()
+            .map(index -> !index.equals(NOT_A_VALUE) && index.asNumeric().compareTo(valueCount) < 0 && index.asNumeric().compareTo(ZERO) >= 0
+                // Values are ordered from most to least recent, so index 0 refers to the last element.
+                ? valueList.get(valueList.size() - 1 - index.asNumeric().intValueExact())
+                : NOT_A_VALUE)
+            .collect(toUnmodifiableList());
     }
 
     @Override

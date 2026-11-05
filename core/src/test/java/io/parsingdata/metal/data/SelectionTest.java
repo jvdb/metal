@@ -34,6 +34,7 @@ import static io.parsingdata.metal.util.ParseStateFactory.stream;
 import static io.parsingdata.metal.util.TokenDefinitions.any;
 
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -56,13 +57,13 @@ public class SelectionTest {
     @Test
     public void findItemAtOffsetTest() {
         assertEquals("the_one",
-            findItemAtOffset(ImmutableList.create(EMPTY.add(new ParseValue("two", any("a"), Slice.createFromSource(source, BigInteger.valueOf(2), BigInteger.valueOf(2)).get(), enc()))
+            findItemAtOffset(List.of(EMPTY.add(new ParseValue("two", any("a"), Slice.createFromSource(source, BigInteger.valueOf(2), BigInteger.valueOf(2)).get(), enc()))
                                                        .add(new ParseValue("zero", any("a"), Slice.createFromSource(source, ZERO, BigInteger.valueOf(2)).get(), enc()))
-                                                       .add(new ParseValue("the_one", any("a"), Slice.createFromSource(source, ONE, BigInteger.valueOf(2)).get(), enc()))), ZERO, source).computeResult().get().asGraph().head.asValue().name);
+                                                       .add(new ParseValue("the_one", any("a"), Slice.createFromSource(source, ONE, BigInteger.valueOf(2)).get(), enc()))), ZERO, source).get().asGraph().head.asValue().name);
         assertEquals("zero",
-            findItemAtOffset(ImmutableList.<ParseItem>create(new ParseValue("zero", any("a"), Slice.createFromSource(source, ZERO, BigInteger.valueOf(2)).get(), enc()))
-                                          .add(new ParseValue("offsetMatchOtherSource", any("a"), Slice.createFromSource(otherSource, ZERO, BigInteger.valueOf(2)).get(), enc()))
-                                          .add(new ParseValue("otherOffsetMatchSource", any("a"), Slice.createFromSource(source, ONE, BigInteger.valueOf(2)).get(), enc())), ZERO, source).computeResult().get().asValue().name);
+            findItemAtOffset(List.<ParseItem>of(new ParseValue("otherOffsetMatchSource", any("a"), Slice.createFromSource(source, ONE, BigInteger.valueOf(2)).get(), enc()),
+                                                new ParseValue("offsetMatchOtherSource", any("a"), Slice.createFromSource(otherSource, ZERO, BigInteger.valueOf(2)).get(), enc()),
+                                                new ParseValue("zero", any("a"), Slice.createFromSource(source, ZERO, BigInteger.valueOf(2)).get(), enc())), ZERO, source).get().asValue().name);
     }
 
     @Test
@@ -70,13 +71,13 @@ public class SelectionTest {
         Optional<ParseState> parseState = rep(any("a")).parse(env(stream(1, 2, 3, 4, 5)));
         assertTrue(parseState.isPresent());
         for (int i = 0; i < 7; i++) {
-            assertEquals(Math.min(5, i), getAllValues(parseState.get().order, (value) -> value.matches("a"), i).size);
+            assertEquals(Math.min(5, i), getAllValues(parseState.get().order, (value) -> value.matches("a"), i).size());
         }
     }
 
     @Test
     public void emptyGraph() {
-        assertEquals(0, getAllValues(EMPTY, (value) -> true, NO_LIMIT, 2, 0).size);
+        assertEquals(0, getAllValues(EMPTY, (value) -> true, NO_LIMIT, 2, 0).size());
     }
 
 }

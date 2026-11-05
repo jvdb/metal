@@ -31,30 +31,30 @@ import static io.parsingdata.metal.util.ParseStateFactory.stream;
 import static io.parsingdata.metal.util.TokenDefinitions.any;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
 import io.parsingdata.metal.data.Environment;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 
 public class FoldCatTest {
 
     @Test
     public void foldCatRegular() {
-        final ImmutableList<Value> string = foldString("any");
-        assertEquals(1, string.size);
-        assertEquals("abc", string.head.asString());
+        final List<Value> string = foldString("any");
+        assertEquals(1, string.size());
+        assertEquals("abc", string.get(0).asString());
     }
 
     @Test
     public void foldCatEmpty() {
-        final ImmutableList<Value> noString = foldString("other");
+        final List<Value> noString = foldString("other");
         assertTrue(noString.isEmpty());
     }
 
-    private ImmutableList<Value> foldString(final String name) {
+    private List<Value> foldString(final String name) {
         final Optional<ParseState> result =
             seq(any("any"),
                 any("any"),
@@ -65,7 +65,7 @@ public class FoldCatTest {
 
     @Test
     public void foldCatEmptyResult() {
-        ImmutableList<Value> values = cat(div(con(1), con(0))).eval(EMPTY_PARSE_STATE, enc());
+        List<Value> values = cat(div(con(1), con(0))).eval(EMPTY_PARSE_STATE, enc());
         assertTrue(values.isEmpty());
     }
 

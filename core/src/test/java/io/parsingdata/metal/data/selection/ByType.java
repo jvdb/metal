@@ -19,9 +19,10 @@ package io.parsingdata.metal.data.selection;
 
 import static io.parsingdata.metal.Util.checkNotNull;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseGraph;
 import io.parsingdata.metal.data.ParseItem;
 
@@ -29,18 +30,20 @@ public final class ByType {
 
     private ByType() {}
 
-    public static ImmutableList<Optional<ParseItem>> getReferences(final ParseGraph graph) {
+    public static List<Optional<ParseItem>> getReferences(final ParseGraph graph) {
         checkNotNull(graph, "graph");
         return getReferences(graph, graph);
     }
 
-    private static ImmutableList<Optional<ParseItem>> getReferences(final ParseGraph graph, final ParseGraph root) {
+    private static List<Optional<ParseItem>> getReferences(final ParseGraph graph, final ParseGraph root) {
         if (graph.isEmpty()) {
-            return new ImmutableList<>();
+            return List.of();
         }
         final ParseItem head = graph.head;
         if (head.isReference() && head.asReference().resolve(root).isEmpty()) { throw new IllegalStateException("A ParseReference must point to an existing graph."); }
-        return getReferences(graph.tail, root).add(head.isGraph() ? getReferences(head.asGraph(), root) : (head.isReference() ? ImmutableList.create(head.asReference().resolve(root)) : new ImmutableList<>()));
+        final List<Optional<ParseItem>> references = new ArrayList<>(head.isGraph() ? getReferences(head.asGraph(), root) : (head.isReference() ? List.of(head.asReference().resolve(root)) : List.of()));
+        references.addAll(getReferences(graph.tail, root));
+        return references;
     }
 
 }

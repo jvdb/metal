@@ -18,9 +18,10 @@
 package io.parsingdata.metal.data.selection;
 
 import static io.parsingdata.metal.Util.checkNotNull;
-import static io.parsingdata.metal.data.Selection.reverse;
+import static io.parsingdata.metal.Util.reverse;
 
-import io.parsingdata.metal.data.ImmutableList;
+import java.util.List;
+import java.util.stream.Collectors;
 import io.parsingdata.metal.data.ParseGraph;
 import io.parsingdata.metal.data.ParseValue;
 import io.parsingdata.metal.data.Selection;
@@ -35,7 +36,7 @@ public final class ByName {
      * @return The first value (bottom-up) with the provided name in the provided graph
      */
     public static ParseValue getValue(final ParseGraph graph, final String name) {
-        return Selection.getAllValues(graph, (value) -> value.matches(name), 1).head;
+        return Selection.getAllValues(graph, (value) -> value.matches(name), 1).stream().findFirst().orElse(null);
     }
 
     /**
@@ -43,34 +44,18 @@ public final class ByName {
      * @param name Name of the value
      * @return All values with the provided name in this graph
      */
-    public static ImmutableList<ParseValue> getAllValues(final ParseGraph graph, final String name) {
+    public static List<ParseValue> getAllValues(final ParseGraph graph, final String name) {
         checkNotNull(graph, "graph");
         checkNotNull(name, "name");
         return reverse(Selection.getAllValues(graph, (value) -> value.matches(name)));
     }
 
-    public static ParseValue get(final ImmutableList<ParseValue> list, final String name) {
-        if (list.isEmpty()) {
-            return null;
-        }
-        if (list.head.matches(name)) {
-            return list.head;
-        }
-        else {
-            return get(list.tail, name);
-        }
+    public static ParseValue get(final List<ParseValue> list, final String name) {
+        return list.stream().filter(value -> value.matches(name)).findFirst().orElse(null);
     }
 
-    public static ImmutableList<ParseValue> getAll(final ImmutableList<ParseValue> list, final String name) {
-        if (list.isEmpty()) {
-            return list;
-        }
-        final ImmutableList<ParseValue> tailList = getAll(list.tail, name);
-        if (list.head.matches(name)) {
-            return tailList.add(list.head);
-        } else {
-            return tailList;
-        }
+    public static List<ParseValue> getAll(final List<ParseValue> list, final String name) {
+        return list.stream().filter(value -> value.matches(name)).collect(Collectors.toUnmodifiableList());
     }
 
 }

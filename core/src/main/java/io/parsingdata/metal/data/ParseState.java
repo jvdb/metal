@@ -20,13 +20,19 @@ package io.parsingdata.metal.data;
 import static java.math.BigInteger.ONE;
 import static java.math.BigInteger.ZERO;
 
+import static io.parsingdata.metal.Util.appendShared;
 import static io.parsingdata.metal.Util.checkNotNegative;
 import static io.parsingdata.metal.Util.checkNotNull;
 import static io.parsingdata.metal.Util.format;
+import static io.parsingdata.metal.Util.prepend;
+import static io.parsingdata.metal.Util.sharedPrefix;
 import static io.parsingdata.metal.data.ParseValueCache.NO_CACHE;
 import static io.parsingdata.metal.data.Slice.createFromSource;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -40,63 +46,96 @@ public class ParseState extends ImmutableObject {
     public final ParseValueCache cache;
     public final BigInteger offset;
     public final Source source;
-    public final ImmutableList<ImmutablePair<Token, BigInteger>> iterations;
-    public final ImmutableList<ParseReference> references;
+    /**
+     * The iteration counts of the iterable tokens currently being parsed, innermost first.
+     */
+    public final List<Map.Entry<Token, BigInteger>> iterations;
+    // The references are stored in a list that is shared between parse states and only grows (see
+    // Util.appendShared). This parse state only uses the first referenceCount elements.
+    private final List<ParseReference> references;
+    private final int referenceCount;
 
-    public ParseState(final ParseGraph order, final ParseValueCache cache, final Source source, final BigInteger offset, final ImmutableList<ImmutablePair<Token, BigInteger>> iterations, final ImmutableList<ParseReference> references) {
+    /**
+     * @param iterations the iteration counts of the iterable tokens currently being parsed, innermost first
+     * @param references the references to tokens parsed so far, in the order they were added
+     */
+    public ParseState(final ParseGraph order, final ParseValueCache cache, final Source source, final BigInteger offset, final List<Map.Entry<Token, BigInteger>> iterations, final List<ParseReference> references) {
+        this(order, cache, source, offset, List.copyOf(checkNotNull(iterations, "iterations")), new ArrayList<>(List.copyOf(checkNotNull(references, "references"))), references.size());
+    }
+
+    private ParseState(final ParseGraph order, final ParseValueCache cache, final Source source, final BigInteger offset, final List<Map.Entry<Token, BigInteger>> iterations, final List<ParseReference> references, final int referenceCount) {
         this.order = checkNotNull(order, "order");
         this.cache = checkNotNull(cache, "cache");
         this.source = checkNotNull(source, "source");
         this.offset = checkNotNegative(offset, "offset");
-        this.iterations = checkNotNull(iterations, "iterations");
-        this.references = checkNotNull(references, "references");
+        this.iterations = iterations;
+        this.references = references;
+        this.referenceCount = referenceCount;
     }
 
     public static ParseState createFromByteStream(final ByteStream input, final BigInteger offset) {
-        return new ParseState(ParseGraph.EMPTY, new ParseValueCache(), new ByteStreamSource(input), offset, new ImmutableList<>(), new ImmutableList<>());
+        return new ParseState(ParseGraph.EMPTY, new ParseValueCache(), new ByteStreamSource(input), offset, List.of(), List.of());
     }
 
     public static ParseState createFromByteStream(final ByteStream input) {
         return createFromByteStream(input, ZERO);
     }
 
+    /**
+     * @return the references to tokens parsed so far, in the order they were added
+     */
+    public List<ParseReference> references() {
+        return sharedPrefix(references, referenceCount);
+    }
+
+    public boolean containsReference(final ParseReference parseReference) {
+        synchronized (references) {
+            return references.subList(0, referenceCount).contains(parseReference);
+        }
+    }
+
     public ParseState addBranch(final Token token) {
-        return new ParseState(order.addBranch(token), cache, source, offset, token.isIterable() ? iterations.add(new ImmutablePair<>(token, ZERO)) : iterations, references);
+        return new ParseState(order.addBranch(token), cache, source, offset, token.isIterable() ? prepend(Map.entry(token, ZERO), iterations) : iterations, references, referenceCount);
     }
 
     public ParseState closeBranch(final Token token) {
-        if (token.isIterable() && !iterations.head.left.equals(token)) {
-            throw new IllegalStateException(format("Cannot close branch for iterable token %s. Current iteration state is for token %s.", token.name, iterations.head.left.name));
+        if (token.isIterable() && !iterations.get(0).getKey().equals(token)) {
+            throw new IllegalStateException(format("Cannot close branch for iterable token %s. Current iteration state is for token %s.", token.name, iterations.get(0).getKey().name));
         }
-        return new ParseState(order.closeBranch(token), cache, source, offset, token.isIterable() ? iterations.tail : iterations, references);
+        return new ParseState(order.closeBranch(token), cache, source, offset, token.isIterable() ? List.copyOf(iterations.subList(1, iterations.size())) : iterations, references, referenceCount);
     }
 
     public ParseState add(final ParseReference parseReference) {
-        return new ParseState(order, cache, source, offset, iterations, references.add(parseReference));
+        return new ParseState(order, cache, source, offset, iterations, appendShared(references, referenceCount, parseReference), referenceCount + 1);
     }
 
     public ParseState add(final ParseValue parseValue) {
-        return new ParseState(order.add(parseValue), cache.add(parseValue), source, offset, iterations, references);
+        return new ParseState(order.add(parseValue), cache.add(parseValue), source, offset, iterations, references, referenceCount);
     }
 
     public ParseState createCycle(final ParseReference parseReference) {
-        return new ParseState(order.add(parseReference), cache, source, offset, iterations, references);
+        return new ParseState(order.add(parseReference), cache, source, offset, iterations, references, referenceCount);
     }
 
     public ParseState iterate() {
-        return new ParseState(order, cache, source, offset, iterations.tail.add(new ImmutablePair<>(iterations.head.left, iterations.head.right.add(ONE))), references);
+        final Map.Entry<Token, BigInteger> current = iterations.get(0);
+        return new ParseState(order, cache, source, offset, prepend(Map.entry(current.getKey(), current.getValue().add(ONE)), iterations.subList(1, iterations.size())), references, referenceCount);
     }
 
     public Optional<ParseState> seek(final BigInteger newOffset) {
-        return newOffset.compareTo(ZERO) >= 0 ? Optional.of(new ParseState(order, cache, source, newOffset, iterations, references)) : Optional.empty();
+        return newOffset.compareTo(ZERO) >= 0 ? Optional.of(new ParseState(order, cache, source, newOffset, iterations, references, referenceCount)) : Optional.empty();
     }
 
     public ParseState withOrder(final ParseGraph order) {
-        return new ParseState(order, NO_CACHE, source, offset, iterations, references);
+        return new ParseState(order, NO_CACHE, source, offset, iterations, references, referenceCount);
+    }
+
+    public ParseState withOrder(final ParseGraph order, final ParseValueCache cache) {
+        return new ParseState(order, cache, source, offset, iterations, references, referenceCount);
     }
 
     public ParseState withSource(final Source source) {
-        return new ParseState(order, cache, source, ZERO, iterations, references);
+        return new ParseState(order, cache, source, ZERO, iterations, references, referenceCount);
     }
 
     public Optional<Slice> slice(final BigInteger length) {
@@ -106,7 +145,7 @@ public class ParseState extends ImmutableObject {
     @Override
     public String toString() {
         final String iterationsString = iterations.isEmpty() ? "" : ";iterations:" + iterations;
-        final String referencesString = references.isEmpty() ? "" : ";references:" + references;
+        final String referencesString = referenceCount == 0 ? "" : ";references:" + references();
         return getClass().getSimpleName() + "(source:" + source + ";offset:" + offset + ";order:" + order + iterationsString + referencesString + ";" + cache + ")";
     }
 
@@ -118,12 +157,12 @@ public class ParseState extends ImmutableObject {
             && Objects.equals(offset, ((ParseState)obj).offset)
             && Objects.equals(source, ((ParseState)obj).source)
             && Objects.equals(iterations, ((ParseState)obj).iterations)
-            && Objects.equals(references, ((ParseState)obj).references);
+            && Objects.equals(references(), ((ParseState)obj).references());
     }
 
     @Override
     public int immutableHashCode() {
-        return Objects.hash(getClass(), order, cache, offset, source, iterations, references);
+        return Objects.hash(getClass(), order, cache, offset, source, iterations, references());
     }
 
 }

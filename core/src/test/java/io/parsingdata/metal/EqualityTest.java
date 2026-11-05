@@ -50,13 +50,12 @@ import static io.parsingdata.metal.util.TokenDefinitions.any;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
 import io.parsingdata.metal.data.ConstantSource;
-import io.parsingdata.metal.data.ImmutableList;
-import io.parsingdata.metal.data.ImmutablePair;
 import io.parsingdata.metal.data.ParseGraph;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.data.ParseValue;
@@ -101,16 +100,16 @@ public class EqualityTest {
     public void cycleWithIdenticalTokens() {
         final Optional<ParseState> result = LINKED_LIST_COMPOSED_IDENTICAL.parse(env(stream(0, 0, 1)));
         assertTrue(result.isPresent());
-        assertEquals(1, getAllValues(result.get().order, "header").size);
-        assertEquals(2, getReferences(result.get().order).size);
+        assertEquals(1, getAllValues(result.get().order, "header").size());
+        assertEquals(2, getReferences(result.get().order).size());
     }
 
     @Test
     public void cycleWithEqualTokens() {
         final Optional<ParseState> result = LINKED_LIST_COMPOSED_EQUAL.parse(env(stream(0, 0, 1)));
         assertTrue(result.isPresent());
-        assertEquals(1, getAllValues(result.get().order, "header").size);
-        assertEquals(2, getReferences(result.get().order).size);
+        assertEquals(1, getAllValues(result.get().order, "header").size());
+        assertEquals(2, getReferences(result.get().order).size());
     }
 
     @Test
@@ -156,31 +155,19 @@ public class EqualityTest {
         }
     }
 
-    @Test
-    public void immutableList() {
-        final ImmutableList<Object> object = ImmutableList.create("a");
-        assertFalse(object.equals(null));
-        assertEquals(object, ImmutableList.create("a"));
-        assertEquals(object, new ImmutableList<>().add("a"));
-        assertNotEquals("a", object);
-        assertEquals(object.add("b"), ImmutableList.create("a").add("b"));
-        assertEquals(object.add("b").add("c"), ImmutableList.create("a").add("b").add("c"));
-        assertNotEquals(object.add("b"), ImmutableList.create("a").add("c"));
-        assertNotEquals(object.add("b").add("c"), ImmutableList.create("a").add("c").add("c"));
-    }
 
     @Test
     public void immutablePair() {
-        final ImmutablePair<String, BigInteger> object = new ImmutablePair<>("a", ONE);
+        final Map.Entry<String, BigInteger> object = Map.entry("a", ONE);
         assertFalse(object.equals(null));
-        assertEquals(object, new ImmutablePair<>("a", ONE));
-        assertEquals(object.hashCode(), new ImmutablePair<>("a", ONE).hashCode());
+        assertEquals(object, Map.entry("a", ONE));
+        assertEquals(object.hashCode(), Map.entry("a", ONE).hashCode());
         assertNotEquals("a", object);
         assertNotEquals(object.hashCode(), "a".hashCode());
-        assertNotEquals(object, new ImmutablePair<>("b", ONE));
-        assertNotEquals(object.hashCode(), new ImmutablePair<>("b", ONE).hashCode());
-        assertNotEquals(object, new ImmutablePair<>("a", ZERO));
-        assertNotEquals(object.hashCode(), new ImmutablePair<>("a", ZERO).hashCode());
+        assertNotEquals(object, Map.entry("b", ONE));
+        assertNotEquals(object.hashCode(), Map.entry("b", ONE).hashCode());
+        assertNotEquals(object, Map.entry("a", ZERO));
+        assertNotEquals(object.hashCode(), Map.entry("a", ZERO).hashCode());
     }
 
     @Test

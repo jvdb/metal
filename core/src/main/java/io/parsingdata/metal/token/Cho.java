@@ -17,20 +17,18 @@
 
 package io.parsingdata.metal.token;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkContainsNoNulls;
 import static io.parsingdata.metal.Util.checkNotNull;
+import static io.parsingdata.metal.Util.failure;
+import static io.parsingdata.metal.Util.prepend;
 import static io.parsingdata.metal.Util.success;
-import static io.parsingdata.metal.data.ImmutableList.create;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import io.parsingdata.metal.Trampoline;
-import io.parsingdata.metal.Util;
 import io.parsingdata.metal.data.Environment;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 
@@ -43,28 +41,23 @@ import io.parsingdata.metal.encoding.Encoding;
  */
 public class Cho extends CycleToken {
 
-    public final ImmutableList<Token> tokens;
+    public final List<Token> tokens;
 
     public Cho(final String name, final Encoding encoding, final Token token1, final Token token2, final Token... additionalTokens) {
         super(name, encoding);
-        this.tokens = create(checkContainsNoNulls(additionalTokens, "additionalTokens"))
-            .add(checkNotNull(token2, "token2"))
-            .add(checkNotNull(token1, "token1"));
+        this.tokens = prepend(checkNotNull(token1, "token1"), prepend(checkNotNull(token2, "token2"), Arrays.asList(checkContainsNoNulls(additionalTokens, "additionalTokens"))));
     }
 
     @Override
     protected Optional<ParseState> parseImpl(final Environment environment) {
-        return iterate(environment.addBranch(this), tokens).computeResult();
-    }
-
-    private Trampoline<Optional<ParseState>> iterate(final Environment environment, final ImmutableList<Token> list) {
-        if (list.isEmpty()) {
-            return complete(Util::failure);
+        final Environment branchedEnvironment = environment.addBranch(this);
+        for (final Token token : tokens) {
+            final Optional<ParseState> result = token.parse(branchedEnvironment);
+            if (result.isPresent()) {
+                return success(result.get().closeBranch(this));
+            }
         }
-        return list.head
-            .parse(environment)
-            .map(result -> complete(() -> success(result.closeBranch(this))))
-            .orElseGet(() -> intermediate(() -> iterate(environment, list.tail)));
+        return failure();
     }
 
     @Override

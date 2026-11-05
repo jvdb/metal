@@ -19,12 +19,12 @@ package io.parsingdata.metal.expression.value.reference;
 
 import static io.parsingdata.metal.Util.checkNotNull;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 import io.parsingdata.metal.ImmutableObject;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 import io.parsingdata.metal.expression.value.SingleValueExpression;
@@ -45,8 +45,8 @@ public class Last extends ImmutableObject implements SingleValueExpression {
 
     @Override
     public Optional<Value> evalSingle(final ParseState parseState, final Encoding encoding) {
-        final ImmutableList<Value> values = operand.eval(parseState, encoding);
-        return values.isEmpty() ? Optional.empty() : Optional.of(values.head);
+        final List<Value> values = operand.eval(parseState, encoding);
+        return values.isEmpty() ? Optional.empty() : Optional.of(values.get(0));
     }
 
     @Override

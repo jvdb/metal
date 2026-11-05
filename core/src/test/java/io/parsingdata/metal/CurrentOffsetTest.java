@@ -32,11 +32,11 @@ import static io.parsingdata.metal.data.ParseState.createFromByteStream;
 import static io.parsingdata.metal.util.EncodingFactory.enc;
 import static io.parsingdata.metal.util.EnvironmentFactory.env;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 import io.parsingdata.metal.encoding.Sign;
@@ -51,11 +51,11 @@ public class CurrentOffsetTest {
         final Optional<ParseState> result = def("a", con(size)).parse(env(createFromByteStream(new InMemoryByteStream(data)), enc()));
         assertTrue(result.isPresent());
 
-        final ImmutableList<Value> offset = CURRENT_OFFSET.eval(result.get(), enc());
+        final List<Value> offset = CURRENT_OFFSET.eval(result.get(), enc());
 
         assertNotNull(offset);
-        assertEquals(1, offset.size);
-        assertEquals(size, offset.head.asNumeric().longValueExact());
+        assertEquals(1, offset.size());
+        assertEquals(size, offset.get(0).asNumeric().longValueExact());
     }
 
     @Test

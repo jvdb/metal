@@ -21,6 +21,9 @@ import static java.math.BigInteger.ZERO;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.zip.DataFormatException;
@@ -33,7 +36,6 @@ import io.parsingdata.metal.expression.value.CoreValue;
 import io.parsingdata.metal.expression.value.UnaryValueExpression;
 import io.parsingdata.metal.expression.value.Value;
 import io.parsingdata.metal.expression.value.ValueExpression;
-
 public final class Util {
 
     private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray(); // Private because array content is mutable.
@@ -55,6 +57,86 @@ public final class Util {
             }
         }
         return arguments;
+    }
+
+    /**
+     * Appends a value to a list that is shared between immutable objects, where each object only uses the first
+     * {@code size} elements of the list.
+     * <p>
+     * If no other object has appended to the list yet, the value is appended in place and the same list is
+     * returned. Otherwise, the first {@code size} elements are copied to a new list and the value is appended to
+     * that. This keeps the common case of growing the newest version cheap, while older versions remain unchanged.
+     * The list must only be modified through this method and read through {@link #sharedPrefix(List, int)}.
+     *
+     * @param list the shared list, or {@code null} to start a new one
+     * @param size the number of elements of {@code list} that the caller uses
+     * @param value the value to append
+     * @param <T> the type of elements in the list
+     * @return a list of which the first {@code size + 1} elements are the caller's elements followed by {@code value}
+     */
+    public static <T> List<T> appendShared(final List<T> list, final int size, final T value) {
+        checkNotNull(value, "value");
+        if (list == null) {
+            final List<T> newList = new ArrayList<>();
+            newList.add(value);
+            return newList;
+        }
+        synchronized (list) {
+            if (list.size() == size) {
+                list.add(value);
+                return list;
+            }
+            final List<T> newList = new ArrayList<>(list.subList(0, size));
+            newList.add(value);
+            return newList;
+        }
+    }
+
+    /**
+     * Returns an unmodifiable copy of the first {@code size} elements of a list maintained through
+     * {@link #appendShared(List, int, Object)}.
+     *
+     * @param list the shared list, or {@code null} if it has not been created yet
+     * @param size the number of elements to copy
+     * @param <T> the type of elements in the list
+     * @return an unmodifiable list containing the first {@code size} elements of {@code list}
+     */
+    public static <T> List<T> sharedPrefix(final List<T> list, final int size) {
+        if (list == null) {
+            return List.of();
+        }
+        synchronized (list) {
+            return List.copyOf(list.subList(0, size));
+        }
+    }
+
+    /**
+     * Returns an unmodifiable list with {@code value} as its first element, followed by the elements of
+     * {@code list}.
+     *
+     * @param value the value to put in front
+     * @param list the list to add the value to
+     * @param <T> the type of elements in the list
+     * @return a new unmodifiable list
+     */
+    public static <T> List<T> prepend(final T value, final List<? extends T> list) {
+        final List<T> result = new ArrayList<>(list.size() + 1);
+        result.add(checkNotNull(value, "value"));
+        result.addAll(list);
+        return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Returns an unmodifiable list containing the elements of {@code list} in reverse order.
+     *
+     * @param list the list to reverse
+     * @param <T> the type of elements in the list
+     * @return a new unmodifiable list
+     */
+    public static <T> List<T> reverse(final List<? extends T> list) {
+        final List<T> result = new ArrayList<>(checkNotNull(list, "list"));
+        Collections.reverse(result);
+        return Collections.unmodifiableList(result);
     }
 
     public static String checkNotEmpty(final String argument, final String name) {

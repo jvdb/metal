@@ -18,6 +18,7 @@ import static io.parsingdata.metal.data.ParseState.createFromByteStream;
 import static io.parsingdata.metal.util.EnvironmentFactory.env;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.data.ParseValue;
 import io.parsingdata.metal.data.Selection;
@@ -101,13 +101,12 @@ class ImmutableObjectTest {
         final Optional<ParseState> result = deep.parse(env(createFromByteStream(new InMemoryByteStream(input))));
         assertTrue(result.isPresent());
 
-        ImmutableList<ParseValue> allValues = Selection.getAllValues(result.get().order, x -> true);
-        assertThat(allValues.size, equalTo(66L));
+        final List<ParseValue> allValues = Selection.getAllValues(result.get().order, x -> true);
+        assertThat(allValues.size(), equalTo(66));
 
         final Map<ParseValue, Value> values = new HashMap<>();
-        while (allValues != null && allValues.head != null) {
-            values.put(allValues.head, allValues.head);
-            allValues = allValues.tail;
+        for (final ParseValue value : allValues) {
+            values.put(value, value);
         }
         assertThat(values.size(), equalTo(66));
     }

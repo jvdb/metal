@@ -18,20 +18,20 @@
 package io.parsingdata.metal.expression.value;
 
 import static java.math.BigInteger.ONE;
+import static java.math.BigInteger.ZERO;
+import static java.util.Collections.unmodifiableList;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
 import static io.parsingdata.metal.data.Slice.createFromSource;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 
@@ -57,26 +57,24 @@ public class Bytes extends ImmutableObject implements ValueExpression {
         this.operand = checkNotNull(operand, "operand");
     }
 
+    /**
+     * Returns a value for every byte of every value of the operand. Just like the order of the values, the order of
+     * the bytes is reversed: the last byte of the last value comes first.
+     */
     @Override
-    public ImmutableList<Value> eval(final ParseState parseState, final Encoding encoding) {
-        final ImmutableList<Value> values = operand.eval(parseState, encoding);
-        return values.isEmpty() ? values : toByteValues(new ImmutableList<>(), values.head, values.tail, encoding).computeResult();
-    }
-
-    private Trampoline<ImmutableList<Value>> toByteValues(final ImmutableList<Value> output, final Value head, final ImmutableList<Value> tail, final Encoding encoding) {
-        final ImmutableList<Value> result = output.add(extractByteValues(new ImmutableList<>(), head, 0, encoding).computeResult());
-        if (tail.isEmpty()) {
-            return complete(() -> result);
-        } else {
-            return intermediate(() -> toByteValues(result, tail.head, tail.tail, encoding));
+    public List<Value> eval(final ParseState parseState, final Encoding encoding) {
+        final List<Value> values = operand.eval(parseState, encoding);
+        final List<Value> result = new ArrayList<>();
+        for (int i = values.size() - 1; i >= 0; i--) {
+            final Value value = values.get(i);
+            if (value.equals(NOT_A_VALUE)) {
+                continue;
+            }
+            for (BigInteger b = value.length().subtract(ONE); b.compareTo(ZERO) >= 0; b = b.subtract(ONE)) {
+                result.add(new CoreValue(createFromSource(value.slice().source, value.slice().offset.add(b), ONE).get(), encoding));
+            }
         }
-    }
-
-    private Trampoline<ImmutableList<Value>> extractByteValues(final ImmutableList<Value> output, final Value value, final int i, final Encoding encoding) {
-        if (value.equals(NOT_A_VALUE) || BigInteger.valueOf(i).compareTo(value.length()) >= 0) {
-            return complete(() -> output);
-        }
-        return intermediate(() -> extractByteValues(output.add(new CoreValue(createFromSource(value.slice().source, value.slice().offset.add(BigInteger.valueOf(i)), ONE).get(), encoding)), value, i + 1, encoding));
+        return unmodifiableList(result);
     }
 
     @Override

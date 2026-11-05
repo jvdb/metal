@@ -19,13 +19,15 @@ package io.parsingdata.metal.data;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 public class ConcatenatedValueSourceErrorTest {
 
     @Test
     public void emptyConcatenatedValueSource() {
-        assertFalse(ConcatenatedValueSource.create(new ImmutableList<>()).isPresent());
+        assertFalse(ConcatenatedValueSource.create(List.of()).isPresent());
     }
 
 }

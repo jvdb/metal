@@ -35,7 +35,7 @@ import static io.parsingdata.metal.util.TokenDefinitions.any;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import io.parsingdata.metal.data.ImmutableList;
+import java.util.List;
 import io.parsingdata.metal.data.ParseValue;
 
 public class ExpandTest {
@@ -49,7 +49,7 @@ public class ExpandTest {
 
     @Test
     public void expandEmpty() {
-        final ImmutableList<Value> result = exp(ref("a"), con(5)).eval(EMPTY_PARSE_STATE, enc());
+        final List<Value> result = exp(ref("a"), con(5)).eval(EMPTY_PARSE_STATE, enc());
         assertTrue(result.isEmpty());
     }
 
@@ -67,29 +67,29 @@ public class ExpandTest {
 
     @Test
     public void expandZeroTimes() {
-        final ImmutableList<Value> result = exp(con(1), con(0)).eval(EMPTY_PARSE_STATE, enc());
+        final List<Value> result = exp(con(1), con(0)).eval(EMPTY_PARSE_STATE, enc());
         assertTrue(result.isEmpty());
     }
 
     @Test
     public void expandValue() {
-        ImmutableList<Value> result = exp(con(VALUE_1), con(SIZE)).eval(EMPTY_PARSE_STATE, enc());
-        assertEquals(SIZE, result.size);
+        List<Value> result = exp(con(VALUE_1), con(SIZE)).eval(EMPTY_PARSE_STATE, enc());
+        assertEquals(SIZE, result.size());
         for (int i = 0; i < SIZE; i++) {
-            assertEquals(VALUE_1, result.head.asNumeric().intValueExact());
-            result = result.tail;
+            assertEquals(VALUE_1, result.get(0).asNumeric().intValueExact());
+            result = result.subList(1, result.size());
         }
     }
 
     @Test
     public void expandList() {
-        ImmutableList<Value> result = exp(ref("a"), con(SIZE)).eval(createFromByteStream(DUMMY_STREAM).add(PARSEVALUE_2).add(PARSEVALUE_1), enc());
-        assertEquals(2 * SIZE, result.size);
+        List<Value> result = exp(ref("a"), con(SIZE)).eval(createFromByteStream(DUMMY_STREAM).add(PARSEVALUE_2).add(PARSEVALUE_1), enc());
+        assertEquals(2 * SIZE, result.size());
         for (int i = 0; i < SIZE; i++) {
-            assertEquals(VALUE_1, result.head.asNumeric().intValueExact());
-            result = result.tail;
-            assertEquals(VALUE_2, result.head.asNumeric().intValueExact());
-            result = result.tail;
+            assertEquals(VALUE_1, result.get(0).asNumeric().intValueExact());
+            result = result.subList(1, result.size());
+            assertEquals(VALUE_2, result.get(0).asNumeric().intValueExact());
+            result = result.subList(1, result.size());
         }
     }
 

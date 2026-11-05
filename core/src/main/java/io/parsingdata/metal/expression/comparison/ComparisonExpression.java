@@ -17,17 +17,14 @@
 
 package io.parsingdata.metal.expression.comparison;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
+import java.util.List;
 import java.util.Objects;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 import io.parsingdata.metal.expression.Expression;
@@ -58,30 +55,24 @@ public abstract class ComparisonExpression extends ImmutableObject implements Ex
 
     @Override
     public boolean eval(final ParseState parseState, final Encoding encoding) {
-        final ImmutableList<Value> values = value == null
+        final List<Value> values = value == null
             ? parseState.order.current()
-                .map(ImmutableList::<Value>create)
-                .orElseGet(ImmutableList<Value>::new)
+                .map(List::<Value>of)
+                .orElseGet(List::of)
             : value.eval(parseState, encoding);
         if (values.isEmpty()) {
             return false;
         }
-        final ImmutableList<Value> predicates = predicate.eval(parseState, encoding);
-        if (values.size != predicates.size) {
+        final List<Value> predicates = predicate.eval(parseState, encoding);
+        if (values.size() != predicates.size()) {
             return false;
         }
-        return compare(values, predicates).computeResult();
-    }
-
-    private Trampoline<Boolean> compare(final ImmutableList<Value> currents, final ImmutableList<Value> predicates) {
-        if (currents.head.equals(NOT_A_VALUE) || predicates.head.equals(NOT_A_VALUE)) {
-            return complete(() -> false);
+        for (int i = 0; i < values.size(); i++) {
+            if (values.get(i).equals(NOT_A_VALUE) || predicates.get(i).equals(NOT_A_VALUE) || !compare(values.get(i), predicates.get(i))) {
+                return false;
+            }
         }
-        final boolean headResult = compare(currents.head, predicates.head);
-        if (!headResult || currents.tail.isEmpty()) {
-            return complete(() -> headResult);
-        }
-        return intermediate(() -> compare(currents.tail, predicates.tail));
+        return true;
     }
 
     public abstract boolean compare(final Value left, final Value right);

@@ -17,15 +17,22 @@
 
 package io.parsingdata.metal.data;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
+import static java.util.Collections.unmodifiableList;
+
 import static io.parsingdata.metal.Util.checkNotNull;
+import static io.parsingdata.metal.Util.reverse;
 
 import java.math.BigInteger;
+import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Predicate;
 
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.token.Token;
 
 public final class Selection {
@@ -34,138 +41,115 @@ public final class Selection {
 
     private Selection() {}
 
-    public static Trampoline<Optional<ParseItem>> findItemAtOffset(final ImmutableList<ParseItem> items, final BigInteger offset, final Source source) {
+    public static Optional<ParseItem> findItemAtOffset(final List<ParseItem> items, final BigInteger offset, final Source source) {
         checkNotNull(items, "items");
         checkNotNull(source, "source");
-        if (items.isEmpty()) {
-            return complete(Optional::empty);
-        }
-        final ParseItem head = items.head;
-        if (head.isValue() && matchesLocation(head.asValue(), offset, source)) {
-            return complete(() -> Optional.of(head));
-        }
-        if (head.isGraph()) {
-            final ParseValue value = getLowestOffsetValue(ImmutableList.create(head.asGraph()), null).computeResult();
-            if (value != null && matchesLocation(value, offset, source)) {
-                return complete(() -> Optional.of(head));
+        for (final ParseItem item : items) {
+            if (item.isValue() && matchesLocation(item.asValue(), offset, source)) {
+                return Optional.of(item);
+            }
+            if (item.isGraph()) {
+                final ParseValue value = getLowestOffsetValue(item.asGraph());
+                if (value != null && matchesLocation(value, offset, source)) {
+                    return Optional.of(item);
+                }
             }
         }
-        return intermediate(() -> findItemAtOffset(items.tail, offset, source));
+        return Optional.empty();
     }
 
     private static boolean matchesLocation(final ParseValue value, final BigInteger offset, final Source source) {
         return value.slice().offset.compareTo(offset) == 0 && value.slice().source.equals(source);
     }
 
-    private static Trampoline<ParseValue> getLowestOffsetValue(final ImmutableList<ParseGraph> graphList, final ParseValue lowest) {
-        if (graphList.isEmpty()) {
-            return complete(() -> lowest);
+    private static ParseValue getLowestOffsetValue(final ParseGraph root) {
+        ParseValue lowest = null;
+        final Deque<ParseGraph> graphs = new ArrayDeque<>();
+        graphs.push(root);
+        while (!graphs.isEmpty()) {
+            final ParseGraph graph = graphs.pop();
+            if (graph.isEmpty() || !graph.getDefinition().isLocal()) {
+                continue;
+            }
+            graphs.push(graph.tail);
+            if (graph.head.isGraph()) {
+                graphs.push(graph.head.asGraph());
+            } else if (graph.head.isValue()) {
+                lowest = getLowest(lowest, graph.head.asValue());
+            }
         }
-        final ParseGraph graph = graphList.head;
-        if (graph.isEmpty() || !graph.getDefinition().isLocal()) {
-            return intermediate(() -> getLowestOffsetValue(graphList.tail, lowest));
-        }
-        return intermediate(() -> getLowestOffsetValue(addIfGraph(graphList.tail.add(graph.tail), graph.head),
-                                                       compareIfValue(lowest, graph.head)));
-    }
-
-    private static ParseValue compareIfValue(final ParseValue lowest, final ParseItem head) {
-        return head.isValue() ? getLowest(lowest, head.asValue()) : lowest;
+        return lowest;
     }
 
     private static ParseValue getLowest(final ParseValue lowest, final ParseValue value) {
         return lowest == null || lowest.slice().offset.compareTo(value.slice().offset) > 0 ? value : lowest;
     }
 
-    private static ImmutableList<ParseGraph> addIfGraph(final ImmutableList<ParseGraph> graphList, final ParseItem head) {
-        return head.isGraph() ? graphList.add(head.asGraph()) : graphList;
+    /**
+     * Returns all values in the graph that match the predicate. The values are ordered from the least recently
+     * added to the most recently added value.
+     */
+    public static List<ParseValue> getAllValues(final ParseGraph graph, final Predicate<ParseValue> predicate, final int limit) {
+        checkNotNull(graph, "graph");
+        final List<ParseValue> values = new ArrayList<>();
+        final Deque<ParseGraph> graphs = new ArrayDeque<>();
+        graphs.push(graph);
+        while (!graphs.isEmpty() && values.size() != limit) {
+            final ParseGraph current = graphs.pop();
+            if (current.isEmpty()) {
+                continue;
+            }
+            graphs.push(current.tail);
+            if (current.head.isGraph()) {
+                graphs.push(current.head.asGraph());
+            } else if (current.head.isValue() && predicate.test(current.head.asValue())) {
+                values.add(current.head.asValue());
+            }
+        }
+        return reverse(values);
     }
 
-    public static ImmutableList<ParseValue> getAllValues(final ParseGraph graph, final Predicate<ParseValue> predicate, final int limit) {
-        return getAllValues(ImmutableList.create(graph), new ImmutableList<>(), predicate, limit).computeResult();
-    }
-
-    public static ImmutableList<ParseValue> getAllValues(final ParseGraph graph, final Predicate<ParseValue> predicate) {
+    public static List<ParseValue> getAllValues(final ParseGraph graph, final Predicate<ParseValue> predicate) {
         return getAllValues(graph, predicate, NO_LIMIT);
     }
 
-    public static ImmutableList<ParseValue> getAllValues(final ParseGraph graph, final Predicate<ParseValue> predicate, final int limit, final int requestedScope, final int currentScope) {
-        return getAllScopedValues(graph, predicate, limit, requestedScope, currentScope).computeResult();
+    public static List<ParseValue> getAllValues(final ParseGraph graph, final Predicate<ParseValue> predicate, final int limit, final int requestedScope, final int currentScope) {
+        ParseGraph scopedGraph = graph;
+        int scope = currentScope;
+        while (!scopedGraph.isEmpty() && limit != 0) {
+            if (requestedScope >= scope) {
+                return getAllValues(scopedGraph, predicate, limit);
+            }
+            if (scopedGraph.head.getDefinition().isScopeDelimiter()) {
+                scope--;
+            }
+            scopedGraph = scopedGraph.head.asGraph();
+        }
+        return List.of();
     }
 
-    private static Trampoline<ImmutableList<ParseValue>> getAllScopedValues(final ParseGraph graph, final Predicate<ParseValue> predicate, final int limit, final int requestedScope, final int currentScope) {
-        if (graph.isEmpty() || limit == 0) {
-            return complete(ImmutableList::new);
+    public static List<ParseItem> getAllRoots(final ParseGraph graph, final Token definition) {
+        checkNotNull(graph, "graph");
+        checkNotNull(definition, "definition");
+        final List<ParseItem> roots = new ArrayList<>();
+        // Each entry holds an item and its parent graph (null for the root).
+        final Deque<Map.Entry<ParseItem, ParseGraph>> backlog = new ArrayDeque<>();
+        backlog.push(new SimpleImmutableEntry<>(graph, null));
+        while (!backlog.isEmpty()) {
+            final Map.Entry<ParseItem, ParseGraph> entry = backlog.pop();
+            final ParseItem item = entry.getKey();
+            final ParseGraph parent = entry.getValue();
+            if (item.getDefinition().equals(definition) && (parent == null || !parent.getDefinition().equals(definition))) {
+                roots.add(item);
+            }
+            if (item.isGraph() && !item.asGraph().isEmpty()) {
+                final ParseGraph itemGraph = item.asGraph();
+                backlog.push(new SimpleImmutableEntry<>(itemGraph.head, itemGraph));
+                backlog.push(new SimpleImmutableEntry<>(itemGraph.tail, itemGraph));
+            }
         }
-        if (requestedScope >= currentScope) {
-            return complete(() -> getAllValues(graph, predicate, limit));
-        }
-        return intermediate(() -> getAllScopedValues(graph.head.asGraph(), predicate, limit, requestedScope, graph.head.getDefinition().isScopeDelimiter() ? currentScope - 1 : currentScope));
+        Collections.reverse(roots);
+        return unmodifiableList(roots);
     }
 
-    private static Trampoline<ImmutableList<ParseValue>> getAllValues(final ImmutableList<ParseGraph> graphList, final ImmutableList<ParseValue> valueList, final Predicate<ParseValue> predicate, final int limit) {
-        if (graphList.isEmpty() || valueList.size == limit) {
-            return complete(() -> valueList);
-        }
-        final ParseGraph graph = graphList.head;
-        if (graph.isEmpty()) {
-            return intermediate(() -> getAllValues(graphList.tail, valueList, predicate, limit));
-        }
-        return intermediate(() -> getAllValues(addIfGraph(graphList.tail.add(graph.tail), graph.head),
-                                               addIfMatchingValue(valueList, graph.head, predicate),
-                                               predicate,
-                                               limit));
-    }
-
-    private static ImmutableList<ParseValue> addIfMatchingValue(final ImmutableList<ParseValue> valueList, final ParseItem item, final Predicate<ParseValue> predicate) {
-        if (item.isValue() && predicate.test(item.asValue())) {
-            return valueList.add(item.asValue());
-        }
-        return valueList;
-    }
-
-    public static <T> ImmutableList<T> reverse(final ImmutableList<T> list) {
-        if (list.isEmpty()) {
-            return list;
-        }
-        return reverse(list.tail, ImmutableList.create(list.head)).computeResult();
-    }
-
-    private static <T> Trampoline<ImmutableList<T>> reverse(final ImmutableList<T> oldList, final ImmutableList<T> newList) {
-        if (oldList.isEmpty()) {
-            return complete(() -> newList);
-        }
-        return intermediate(() -> reverse(oldList.tail, newList.add(oldList.head)));
-    }
-
-    public static ImmutableList<ParseItem> getAllRoots(final ParseGraph graph, final Token definition) {
-        return getAllRootsRecursive(ImmutableList.create(new Pair(checkNotNull(graph, "graph"), null)), checkNotNull(definition, "definition"), new ImmutableList<>()).computeResult();
-    }
-
-    private static Trampoline<ImmutableList<ParseItem>> getAllRootsRecursive(final ImmutableList<Pair> backlog, final Token definition, final ImmutableList<ParseItem> rootList) {
-        if (backlog.isEmpty()) {
-            return complete(() -> rootList);
-        }
-        final ParseItem item = backlog.head.item;
-        final ParseGraph parent = backlog.head.parent;
-        final ImmutableList<ParseItem> nextResult = item.getDefinition().equals(definition) && (parent == null || !parent.getDefinition().equals(definition)) ? rootList.add(item) : rootList;
-        if (item.isGraph() && !item.asGraph().isEmpty()) {
-            final ParseGraph itemGraph = item.asGraph();
-            return intermediate(() -> getAllRootsRecursive(backlog.tail.add(new Pair(itemGraph.head, itemGraph))
-                                                                       .add(new Pair(itemGraph.tail, itemGraph)),
-                                                           definition,
-                                                           nextResult));
-        }
-        return intermediate(() -> getAllRootsRecursive(backlog.tail, definition, nextResult));
-    }
-
-    static class Pair {
-        public final ParseItem item;
-        public final ParseGraph parent;
-
-        Pair(final ParseItem item, final ParseGraph parent) {
-            this.item = checkNotNull(item, "item");
-            this.parent = parent;
-        }
-    }
 }
