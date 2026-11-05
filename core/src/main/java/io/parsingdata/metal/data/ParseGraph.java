@@ -17,15 +17,14 @@
 
 package io.parsingdata.metal.data;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Objects;
 import java.util.Optional;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
 import io.parsingdata.metal.token.Token;
 
@@ -111,22 +110,19 @@ public class ParseGraph extends ImmutableObject implements ParseItem {
      * @return The first value (bottom-up) in this graph
      */
     public Optional<ParseValue> current() {
-        return current(ImmutableList.create(this)).computeResult();
-    }
-
-    private Trampoline<Optional<ParseValue>> current(final ImmutableList<ParseItem> items) {
-        if (items.isEmpty()) {
-            return complete(Optional::empty);
+        final Deque<ParseItem> items = new ArrayDeque<>();
+        items.push(this);
+        while (!items.isEmpty()) {
+            final ParseItem item = items.pop();
+            if (item.isValue()) {
+                return Optional.of(item.asValue());
+            }
+            if (item.isGraph() && !item.asGraph().isEmpty()) {
+                items.push(item.asGraph().tail);
+                items.push(item.asGraph().head);
+            }
         }
-        final ParseItem item = items.head;
-        if (item.isValue()) {
-            return complete(() -> Optional.of(item.asValue()));
-        }
-        if (item.isGraph() && !item.asGraph().isEmpty()) {
-            return intermediate(() -> current(items.tail.add(item.asGraph().tail)
-                                                        .add(item.asGraph().head)));
-        }
-        return intermediate(() -> current(items.tail));
+        return Optional.empty();
     }
 
     @Override public boolean isGraph() { return true; }

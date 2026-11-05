@@ -17,17 +17,14 @@
 
 package io.parsingdata.metal.expression.value.reference;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 import io.parsingdata.metal.expression.value.SingleValueExpression;
@@ -48,12 +45,8 @@ public class First extends ImmutableObject implements SingleValueExpression {
 
     @Override
     public Optional<Value> evalSingle(final ParseState parseState, final Encoding encoding) {
-        final ImmutableList<Value> values = operand.eval(parseState, encoding);
-        return values.isEmpty() ? Optional.empty() : Optional.of(getFirst(values).computeResult());
-    }
-
-    private Trampoline<Value> getFirst(final ImmutableList<Value> values) {
-        return values.tail.isEmpty() ? complete(() -> values.head) : intermediate(() -> getFirst(values.tail));
+        final List<Value> values = operand.eval(parseState, encoding);
+        return values.isEmpty() ? Optional.empty() : Optional.of(values.get(values.size() - 1));
     }
 
     @Override

@@ -46,7 +46,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 import io.parsingdata.metal.SubStructTest;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseItem;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.token.Token;
@@ -93,8 +92,8 @@ public class CallbackTest {
 
             @Override
             public void handleSuccess(Token token, ParseState before, ParseState after) {
-                final ImmutableList<ParseItem> roots = getAllRoots(after.order, token);
-                assertEquals(offsets[count++], roots.head.asGraph().tail.head.asValue().slice().offset.longValueExact());
+                final List<ParseItem> roots = getAllRoots(after.order, token);
+                assertEquals(offsets[count++], roots.get(0).asGraph().tail.head.asValue().slice().offset.longValueExact());
             }
 
             @Override
@@ -123,16 +122,16 @@ public class CallbackTest {
                 .add(repeatingSeq, new Callback() {
                     @Override
                     public void handleSuccess(Token token, ParseState before, ParseState after) {
-                        final ImmutableList<ParseItem> repRoots = getAllRoots(after.order, token);
-                        assertEquals(1, repRoots.size);
+                        final List<ParseItem> repRoots = getAllRoots(after.order, token);
+                        assertEquals(1, repRoots.size());
 
                         // verify that two Seq tokens were parsed:
-                        final ImmutableList<ParseItem> seqRoots = getAllRoots(after.order, SIMPLE_SEQ);
-                        assertEquals(2, seqRoots.size);
+                        final List<ParseItem> seqRoots = getAllRoots(after.order, SIMPLE_SEQ);
+                        assertEquals(2, seqRoots.size());
 
                         // verify order of the two Seq graphs:
-                        assertEquals(2, getValue(seqRoots.head.asGraph(), "a").slice().offset.intValueExact());
-                        assertEquals(0, getValue(seqRoots.tail.head.asGraph(), "a").slice().offset.intValueExact());
+                        assertEquals(2, getValue(seqRoots.get(0).asGraph(), "a").slice().offset.intValueExact());
+                        assertEquals(0, getValue(seqRoots.get(1).asGraph(), "a").slice().offset.intValueExact());
                     }
 
                     @Override

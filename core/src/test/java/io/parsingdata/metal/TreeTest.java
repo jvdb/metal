@@ -35,7 +35,7 @@ import static io.parsingdata.metal.util.ParseStateFactory.stream;
 
 import org.junit.jupiter.api.Test;
 
-import io.parsingdata.metal.data.ImmutableList;
+import java.util.List;
 import io.parsingdata.metal.data.ParseGraph;
 import io.parsingdata.metal.data.ParseItem;
 import io.parsingdata.metal.data.ParseReference;
@@ -141,23 +141,14 @@ public class TreeTest {
 
     @Test
     public void checkRegularTreeFlat() {
-        final ImmutableList<ParseValue> nrs = getAllValues(regular.order, "nr");
+        final List<ParseValue> nrs = getAllValues(regular.order, "nr");
         for (int i = 0; i < 7; i++) {
             assertTrue(contains(nrs, i));
         }
     }
 
-    private boolean contains(final ImmutableList<ParseValue> nrs, final int i) {
-        if (nrs.isEmpty()) {
-            return false;
-        }
-        if (nrs.head.asNumeric().intValueExact() == i) {
-            return true;
-        }
-        if (nrs.tail != null) {
-            return contains(nrs.tail, i);
-        }
-        return false;
+    private boolean contains(final List<ParseValue> nrs, final int i) {
+        return nrs.stream().anyMatch(value -> value.asNumeric().intValueExact() == i);
     }
 
 }

@@ -17,19 +17,18 @@
 
 package io.parsingdata.metal.expression.value;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
+import static java.util.Collections.unmodifiableList;
+
 import static io.parsingdata.metal.Util.checkNotNull;
-import static io.parsingdata.metal.data.Selection.reverse;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 
@@ -56,18 +55,18 @@ public class Elvis extends ImmutableObject implements ValueExpression {
     }
 
     @Override
-    public ImmutableList<Value> eval(final ParseState parseState, final Encoding encoding) {
-        return reverse(eval(new ImmutableList<>(), left.eval(parseState, encoding), right.eval(parseState, encoding)).computeResult());
-    }
-
-    private Trampoline<ImmutableList<Value>> eval(final ImmutableList<Value> result, final ImmutableList<Value> leftValues, final ImmutableList<Value> rightValues) {
-        if (leftValues.isEmpty()) {
-            return complete(() -> result.add(reverse(rightValues)));
+    public List<Value> eval(final ParseState parseState, final Encoding encoding) {
+        final List<Value> leftValues = left.eval(parseState, encoding);
+        final List<Value> rightValues = right.eval(parseState, encoding);
+        final int pairCount = Math.min(leftValues.size(), rightValues.size());
+        final List<Value> result = new ArrayList<>(Math.max(leftValues.size(), rightValues.size()));
+        for (int i = 0; i < pairCount; i++) {
+            result.add(leftValues.get(i).equals(NOT_A_VALUE) ? rightValues.get(i) : leftValues.get(i));
         }
-        if (rightValues.isEmpty()) {
-            return complete(() -> result.add(reverse(leftValues)));
-        }
-        return intermediate(() -> eval(result.add(leftValues.head.equals(NOT_A_VALUE) ? rightValues.head : leftValues.head), leftValues.tail, rightValues.tail));
+        // Add the remaining values of the longest list.
+        result.addAll(leftValues.subList(pairCount, leftValues.size()));
+        result.addAll(rightValues.subList(pairCount, rightValues.size()));
+        return unmodifiableList(result);
     }
 
     @Override

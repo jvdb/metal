@@ -34,7 +34,7 @@ import static io.parsingdata.metal.util.TokenDefinitions.any;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import io.parsingdata.metal.data.ImmutableList;
+import java.util.List;
 import io.parsingdata.metal.data.ParseState;
 
 public class RefEdgeCaseTest {
@@ -55,9 +55,9 @@ public class RefEdgeCaseTest {
 
     @Test
     public void nanLimit() {
-        final ImmutableList<Value> result = ref(div(con(1), con(0)), "a").eval(parseState, enc());
-        assertEquals(1, result.size);
-        assertEquals(NOT_A_VALUE, result.head);
+        final List<Value> result = ref(div(con(1), con(0)), "a").eval(parseState, enc());
+        assertEquals(1, result.size());
+        assertEquals(NOT_A_VALUE, result.get(0));
     }
 
 }

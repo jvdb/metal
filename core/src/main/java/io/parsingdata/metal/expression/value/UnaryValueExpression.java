@@ -17,19 +17,17 @@
 
 package io.parsingdata.metal.expression.value;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
+import static java.util.stream.Collectors.toUnmodifiableList;
+
 import static io.parsingdata.metal.Util.checkNotNull;
-import static io.parsingdata.metal.data.Selection.reverse;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 
@@ -57,15 +55,10 @@ public abstract class UnaryValueExpression extends ImmutableObject implements Va
     }
 
     @Override
-    public ImmutableList<Value> eval(final ParseState parseState, final Encoding encoding) {
-        return reverse(eval(operand.eval(parseState, encoding), parseState, encoding, new ImmutableList<>()).computeResult());
-    }
-
-    private Trampoline<ImmutableList<Value>> eval(final ImmutableList<Value> values, final ParseState parseState, final Encoding encoding, final ImmutableList<Value> result) {
-        if (values.isEmpty()) {
-            return complete(() -> result);
-        }
-        return intermediate(() -> eval(values.tail, parseState, encoding, result.add(safeEval(values.head, parseState, encoding))));
+    public List<Value> eval(final ParseState parseState, final Encoding encoding) {
+        return operand.eval(parseState, encoding).stream()
+            .map(value -> safeEval(value, parseState, encoding))
+            .collect(toUnmodifiableList());
     }
 
     public abstract Optional<Value> eval(final Value value, final ParseState parseState, final Encoding encoding);

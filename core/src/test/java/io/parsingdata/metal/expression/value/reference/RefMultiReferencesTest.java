@@ -15,10 +15,11 @@ import static io.parsingdata.metal.Shorthand.post;
 import static io.parsingdata.metal.Shorthand.ref;
 import static io.parsingdata.metal.Shorthand.rep;
 import static io.parsingdata.metal.Shorthand.seq;
-import static io.parsingdata.metal.data.Selection.reverse;
+import static io.parsingdata.metal.Util.reverse;
 import static io.parsingdata.metal.util.EncodingFactory.enc;
 import static io.parsingdata.metal.util.ParseStateFactory.stream;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -28,7 +29,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import io.parsingdata.metal.data.Environment;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.expression.value.Value;
 import io.parsingdata.metal.expression.value.ValueExpression;
@@ -99,14 +99,14 @@ class RefMultiReferencesTest {
         assertLists(expected, ref.eval(parseState, enc()));
     }
 
-    private void assertLists(final String expected, final ImmutableList<Value> result) {
-        assertEquals(expected.length(), result.size);
-        ImmutableList<Value> tail = reverse(result);
+    private void assertLists(final String expected, final List<Value> result) {
+        assertEquals(expected.length(), result.size());
+        List<Value> tail = reverse(result);
         for (int i = 0; i < expected.length(); i++) {
             assertNotNull(tail);
-            assertNotNull(tail.head);
-            assertEquals(expected.charAt(i), tail.head.value()[0]);
-            tail = tail.tail;
+            assertNotNull(tail.get(0));
+            assertEquals(expected.charAt(i), tail.get(0).value()[0]);
+            tail = tail.subList(1, tail.size());
         }
     }
 

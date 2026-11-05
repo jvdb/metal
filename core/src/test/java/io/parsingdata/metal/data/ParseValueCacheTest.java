@@ -6,7 +6,7 @@ import static java.math.BigInteger.ZERO;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
@@ -78,29 +78,23 @@ class ParseValueCacheTest {
     @ParameterizedTest
     @MethodSource
     public void findTest(final String scopeName, final List<ParseValue> values) {
-        final Optional<ImmutableList<Value>> nameValues = parseValueCache.find(scopeName, NO_LIMIT);
+        final Optional<List<Value>> nameValues = parseValueCache.find(scopeName, NO_LIMIT);
         assertTrue(nameValues.isPresent());
         nameValues.ifPresent(result -> {
-            assertEquals(values.size(), result.size);
-            ImmutableList<Value> tail = result;
-            for (int i = 0; i < values.size(); i++) {
-                assertNotNull(tail);
-                assertEquals(values.get(i), tail.head);
-                tail = tail.tail;
-            }
+            assertEquals(values, result);
         });
     }
 
     @ParameterizedTest
     @ValueSource(ints={0, 1, 2, 3, 4})
     public void limitTest(final int limit) {
-        final Optional<ImmutableList<Value>> nameValues = parseValueCache.find("name", limit);
+        final Optional<List<Value>> nameValues = parseValueCache.find("name", limit);
         assertTrue(nameValues.isPresent());
         nameValues.ifPresent(result -> {
-            assertEquals(Math.min(limit, 3), result.size);
-            if (limit > 0) assertEquals(pv3, result.head);
-            if (limit > 1) assertEquals(pv2, result.tail.head);
-            if (limit > 2) assertEquals(pv1, result.tail.tail.head);
+            assertEquals(Math.min(limit, 3), result.size());
+            if (limit > 0) assertEquals(pv3, result.get(0));
+            if (limit > 1) assertEquals(pv2, result.get(1));
+            if (limit > 2) assertEquals(pv1, result.get(2));
         });
     }
 
@@ -128,16 +122,38 @@ class ParseValueCacheTest {
         final ParseValue pv = parseValue("name");
         final ParseValueCache parseValueCache2 = parseValueCache.add(pv);
 
-        final Optional<ImmutableList<Value>> nameValues = parseValueCache.find("name", NO_LIMIT);
+        final Optional<List<Value>> nameValues = parseValueCache.find("name", NO_LIMIT);
         assertTrue(nameValues.isPresent());
-        nameValues.ifPresent(result -> assertEquals(0, result.size));
+        nameValues.ifPresent(result -> assertEquals(0, result.size()));
 
-        final Optional<ImmutableList<Value>> nameValues2 = parseValueCache2.find("name", NO_LIMIT);
+        final Optional<List<Value>> nameValues2 = parseValueCache2.find("name", NO_LIMIT);
         assertTrue(nameValues2.isPresent());
         nameValues2.ifPresent(result -> {
-            assertEquals(1, result.size);
-            assertEquals(pv, result.head);
+            assertEquals(1, result.size());
+            assertEquals(pv, result.get(0));
         });
+    }
+
+    @Test
+    public void branchesAreIndependent() {
+        final ParseValue first = parseValue("a.name");
+        final ParseValue left = parseValue("b.name");
+        final ParseValue right = parseValue("c.name");
+        final ParseValueCache base = new ParseValueCache().add(first);
+        // The first branch can reuse the list of the base cache, the second one cannot.
+        final ParseValueCache leftCache = base.add(left);
+        final ParseValueCache rightCache = base.add(right);
+
+        assertEquals(Optional.of(List.of(first)), base.find("name", NO_LIMIT));
+        assertEquals(Optional.of(List.of(left, first)), leftCache.find("name", NO_LIMIT));
+        assertEquals(Optional.of(List.of(right, first)), rightCache.find("name", NO_LIMIT));
+        assertEquals(Optional.of(List.of(left, left, first)), leftCache.add(left).find("name", NO_LIMIT));
+        assertEquals(Optional.of(List.of(right, left, first)), leftCache.add(right).find("name", NO_LIMIT));
+
+        assertNotEquals(base, leftCache);
+        assertNotEquals(leftCache, rightCache);
+        assertEquals(rightCache, new ParseValueCache().add(first).add(right));
+        assertEquals(rightCache.hashCode(), new ParseValueCache().add(first).add(right).hashCode());
     }
 
     @Test
@@ -183,8 +199,8 @@ class ParseValueCacheTest {
     @ParameterizedTest(name="{2} - {0}")
     @MethodSource
     public void cacheUsageTest(final String testName, final ValueExpression expression, final boolean shouldUseCache) {
-        final ParseState parseState = new ParseState(parseGraph, parseValueCache, createFromBytes(new byte[0]).source, ZERO, new ImmutableList<>(), new ImmutableList<>());
-        final ImmutableList<Value> eval = expression.eval(parseState, enc());
+        final ParseState parseState = new ParseState(parseGraph, parseValueCache, createFromBytes(new byte[0]).source, ZERO, List.of(), List.of());
+        final List<Value> eval = expression.eval(parseState, enc());
         // Only the cache is filled with the values we are referring to.
         // That means, if result is not empty, the cache was used.
         assertEquals(shouldUseCache, !eval.isEmpty());

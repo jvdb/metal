@@ -17,17 +17,16 @@
 
 package io.parsingdata.metal.token;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
 import static io.parsingdata.metal.Util.failure;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Objects;
 import java.util.Optional;
 
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.data.Environment;
-import io.parsingdata.metal.data.ImmutableList;
+import io.parsingdata.metal.data.ParseGraph;
 import io.parsingdata.metal.data.ParseItem;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
@@ -64,26 +63,28 @@ public class TokenRef extends Token {
 
     @Override
     protected Optional<ParseState> parseImpl(final Environment environment) {
-        return lookup(ImmutableList.create(environment.parseState.order), referenceName).computeResult().parse(environment);
+        return lookup(environment.parseState.order, referenceName).parse(environment);
     }
 
-    private Trampoline<Token> lookup(final ImmutableList<ParseItem> items, final String referenceName) {
-        if (items.isEmpty()) {
-            return complete(() -> LOOKUP_FAILED);
+    private Token lookup(final ParseGraph root, final String referenceName) {
+        final Deque<ParseItem> items = new ArrayDeque<>();
+        items.push(root);
+        while (!items.isEmpty()) {
+            final ParseItem item = items.pop();
+            if (item.getDefinition().name.equals(referenceName)) {
+                return item.getDefinition();
+            }
+            if (item.isGraph() && !item.asGraph().isEmpty()) {
+                items.push(item.asGraph().tail);
+                items.push(item.asGraph().head);
+            }
         }
-        final ParseItem item = items.head;
-        if (item.getDefinition().name.equals(referenceName)) {
-            return complete(item::getDefinition);
-        }
-        if (item.isGraph() && !item.asGraph().isEmpty()) {
-            return intermediate(() -> lookup(items.tail.add(item.asGraph().tail).add(item.asGraph().head), referenceName));
-        }
-        return intermediate(() -> lookup(items.tail, referenceName));
+        return LOOKUP_FAILED;
     }
 
     @Override
     public Token getCanonical(final ParseState parseState) {
-        return lookup(ImmutableList.create(parseState.order), referenceName).computeResult();
+        return lookup(parseState.order, referenceName);
     }
 
     @Override

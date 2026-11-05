@@ -32,6 +32,7 @@ import static io.parsingdata.metal.expression.value.ExpandTest.createParseValue;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 import static io.parsingdata.metal.util.EncodingFactory.enc;
 
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 
 /**
@@ -95,21 +95,21 @@ public class JoinTest {
     @ParameterizedTest
     @MethodSource("joinExpressions")
     public void joinWithParseState(final ValueExpression expression, final int[] expected) {
-        ImmutableList<Value> result = expression.eval(PARSE_STATE, enc());
-        assertEquals(expected.length, result.size);
+        List<Value> result = expression.eval(PARSE_STATE, enc());
+        assertEquals(expected.length, result.size());
         assertResult(expected, result);
     }
 
-    private static void assertResult(final int[] expected, final ImmutableList<Value> actual) {
-        ImmutableList<Value> result = actual;
+    private static void assertResult(final int[] expected, final List<Value> actual) {
+        List<Value> result = actual;
         for (final int value : expected) {
             if (value == -1) {
-                assertEquals(NOT_A_VALUE, result.head);
+                assertEquals(NOT_A_VALUE, result.get(0));
             }
             else {
-                assertEquals(value, result.head.asNumeric().intValueExact());
+                assertEquals(value, result.get(0).asNumeric().intValueExact());
             }
-            result = result.tail;
+            result = result.subList(1, result.size());
         }
     }
 

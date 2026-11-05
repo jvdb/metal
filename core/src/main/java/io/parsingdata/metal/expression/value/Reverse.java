@@ -17,13 +17,13 @@
 
 package io.parsingdata.metal.expression.value;
 
-import static io.parsingdata.metal.data.Selection.reverse;
+import static io.parsingdata.metal.Util.reverse;
 
+import java.util.List;
 import java.util.Objects;
 
 import io.parsingdata.metal.ImmutableObject;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 
@@ -43,7 +43,7 @@ public class Reverse extends ImmutableObject implements ValueExpression {
     }
 
     @Override
-    public ImmutableList<Value> eval(final ParseState parseState, final Encoding encoding) {
+    public List<Value> eval(final ParseState parseState, final Encoding encoding) {
         return reverse(values.eval(parseState, encoding));
     }
 

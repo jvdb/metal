@@ -26,16 +26,16 @@ import static io.parsingdata.metal.util.ParseStateFactory.stream;
 
 import org.junit.jupiter.api.Test;
 
-import io.parsingdata.metal.data.ImmutableList;
+import java.util.List;
 import io.parsingdata.metal.expression.value.Value;
 
 public class OffsetTest {
 
     @Test
     public void definedValueOffset() {
-        final ImmutableList<Value> offsetCon = offset(con(1)).eval(stream(), enc());
-        assertEquals(1, offsetCon.size);
-        assertEquals(0, offsetCon.head.asNumeric().intValueExact());
+        final List<Value> offsetCon = offset(con(1)).eval(stream(), enc());
+        assertEquals(1, offsetCon.size());
+        assertEquals(0, offsetCon.get(0).asNumeric().intValueExact());
     }
 
 }

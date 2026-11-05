@@ -24,17 +24,18 @@ import static io.parsingdata.metal.Trampoline.complete;
 import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotEmpty;
 import static io.parsingdata.metal.Util.checkNotNull;
+import static io.parsingdata.metal.Util.failure;
 import static io.parsingdata.metal.Util.success;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
 import io.parsingdata.metal.data.Environment;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.data.ParseValue;
 import io.parsingdata.metal.data.Slice;
@@ -92,17 +93,16 @@ public class DefUntil extends Token {
 
     @Override
     protected Optional<ParseState> parseImpl(final Environment environment) {
-        return handleInterval(environment, initialSize.eval(environment.parseState, environment.encoding), stepSize.eval(environment.parseState, environment.encoding), maxSize.eval(environment.parseState, environment.encoding)).computeResult();
-    }
-
-    private Trampoline<Optional<ParseState>> handleInterval(final Environment environment, final ImmutableList<Value> initialSizes, final ImmutableList<Value> stepSizes, final ImmutableList<Value> maxSizes) {
-        if (checkNotValidList(initialSizes) || checkNotValidList(stepSizes) || checkNotValidList(maxSizes)) {
-            return complete(Util::failure);
+        final List<Value> initialSizes = initialSize.eval(environment.parseState, environment.encoding);
+        final List<Value> stepSizes = stepSize.eval(environment.parseState, environment.encoding);
+        final List<Value> maxSizes = maxSize.eval(environment.parseState, environment.encoding);
+        for (int i = 0; isValid(initialSizes, i) && isValid(stepSizes, i) && isValid(maxSizes, i); i++) {
+            final Optional<ParseState> result = iterate(environment, initialSizes.get(i).asNumeric(), stepSizes.get(i).asNumeric(), maxSizes.get(i).asNumeric()).computeResult();
+            if (result.isPresent()) {
+                return result;
+            }
         }
-        return iterate(environment, getNumeric(initialSizes), getNumeric(stepSizes), getNumeric(maxSizes))
-            .computeResult()
-            .map(nextParseState -> complete(() -> success(nextParseState)))
-            .orElseGet(() -> intermediate(() -> handleInterval(environment, initialSizes.tail, stepSizes.tail, maxSizes.tail)));
+        return failure();
     }
 
     private Trampoline<Optional<ParseState>> iterate(final Environment environment, final BigInteger currentSize, final BigInteger stepSize, final BigInteger maxSize) {
@@ -125,12 +125,8 @@ public class DefUntil extends Token {
             .orElseGet(() -> intermediate(() -> iterate(environment, currentSize.add(stepSize), stepSize, maxSize)));
     }
 
-    private boolean checkNotValidList(final ImmutableList<Value> list) {
-        return list.isEmpty() || list.head.equals(NOT_A_VALUE);
-    }
-
-    private BigInteger getNumeric(final ImmutableList<Value> list) {
-        return list.head.asNumeric();
+    private boolean isValid(final List<Value> list, final int index) {
+        return index < list.size() && !list.get(index).equals(NOT_A_VALUE);
     }
 
     @Override

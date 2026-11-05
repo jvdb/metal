@@ -41,6 +41,7 @@ import static io.parsingdata.metal.util.EnvironmentFactory.env;
 import static io.parsingdata.metal.util.ParseStateFactory.stream;
 import static io.parsingdata.metal.util.TokenDefinitions.any;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.BinaryOperator;
 
@@ -48,7 +49,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import io.parsingdata.metal.Shorthand;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 
 /**
@@ -60,31 +60,31 @@ public class FoldEdgeCaseTest {
 
     @Test
     public void valuesContainsEmpty() {
-        assertEquals(NOT_A_VALUE, foldLeft(div(con(1), con(0)), Shorthand::add).eval(stream(0), enc()).head);
-        assertEquals(NOT_A_VALUE, foldRight(div(con(1), con(0)), Shorthand::add).eval(stream(0), enc()).head);
+        assertEquals(NOT_A_VALUE, foldLeft(div(con(1), con(0)), Shorthand::add).eval(stream(0), enc()).get(0));
+        assertEquals(NOT_A_VALUE, foldRight(div(con(1), con(0)), Shorthand::add).eval(stream(0), enc()).get(0));
     }
 
     @Test
     public void foldToEmpty() {
         final ParseState parseState = rep(any("value")).parse(env(stream(1, 0))).get();
-        final ImmutableList<Value> foldLeftNan = foldLeft(ref("value"), Shorthand::div).eval(parseState, enc());
-        assertEquals(1, foldLeftNan.size);
-        assertEquals(NOT_A_VALUE, foldLeftNan.head);
-        final ImmutableList<Value> foldRightNan = foldRight(ref("value"), Shorthand::div).eval(parseState, enc());
-        assertEquals(1, foldRightNan.size);
-        assertEquals(NOT_A_VALUE, foldRightNan.head);
+        final List<Value> foldLeftNan = foldLeft(ref("value"), Shorthand::div).eval(parseState, enc());
+        assertEquals(1, foldLeftNan.size());
+        assertEquals(NOT_A_VALUE, foldLeftNan.get(0));
+        final List<Value> foldRightNan = foldRight(ref("value"), Shorthand::div).eval(parseState, enc());
+        assertEquals(1, foldRightNan.size());
+        assertEquals(NOT_A_VALUE, foldRightNan.get(0));
     }
 
     @Test
     public void inputContainsEmptyInTail() {
-        assertEquals(NOT_A_VALUE, foldRight((parseState, encoding) -> ImmutableList.create(NOT_A_VALUE).add(new CoreValue(createFromBytes(new byte[] { 1, 2 }), enc())), Shorthand::add).eval(stream(0), enc()).head);
+        assertEquals(NOT_A_VALUE, foldRight((parseState, encoding) -> List.of(new CoreValue(createFromBytes(new byte[] { 1, 2 }), enc()), NOT_A_VALUE), Shorthand::add).eval(stream(0), enc()).get(0));
     }
 
     @Test
     public void notAValueInit() {
-        final ImmutableList<Value> result = fold(exp(con(1), con(2)), Shorthand::add, con(NOT_A_VALUE)).eval(EMPTY_PARSE_STATE, DEFAULT_ENCODING);
-        assertEquals(1, result.size);
-        assertEquals(NOT_A_VALUE, result.head);
+        final List<Value> result = fold(exp(con(1), con(2)), Shorthand::add, con(NOT_A_VALUE)).eval(EMPTY_PARSE_STATE, DEFAULT_ENCODING);
+        assertEquals(1, result.size());
+        assertEquals(NOT_A_VALUE, result.get(0));
     }
 
     @Test

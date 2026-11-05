@@ -17,17 +17,15 @@
 
 package io.parsingdata.metal.data;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNegative;
 import static io.parsingdata.metal.Util.checkNotNull;
 import static io.parsingdata.metal.Util.format;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Objects;
 
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
 import io.parsingdata.metal.encoding.Encoding;
 import io.parsingdata.metal.expression.value.Value;
@@ -68,24 +66,17 @@ public class DataExpressionSource extends Source {
 
     private synchronized byte[] getValue() {
         if (cache == null) {
-            final ImmutableList<Value> results = dataExpression.eval(parseState, encoding);
-            if (results.size <= index) {
-                throw new IllegalStateException(format("ValueExpression dataExpression yields %d result(s) (expected at least %d).", results.size, index+1));
+            final List<Value> results = dataExpression.eval(parseState, encoding);
+            if (results.size() <= index) {
+                throw new IllegalStateException(format("ValueExpression dataExpression yields %d result(s) (expected at least %d).", results.size(), index+1));
             }
-            final Value cacheValue = getValueAtIndex(results, index, 0).computeResult();
+            final Value cacheValue = results.get(index);
             if (cacheValue.equals(NOT_A_VALUE)) {
                 throw new IllegalStateException(format("ValueExpression dataExpression yields NOT_A_VALUE at index %d.", index));
             }
             cache = cacheValue.value();
         }
         return cache;
-    }
-
-    private Trampoline<Value> getValueAtIndex(final ImmutableList<Value> results, final int index, final int current) {
-        if (index == current) {
-            return complete(() -> results.head);
-        }
-        return intermediate(() -> getValueAtIndex(results.tail, index, current + 1));
     }
 
     @Override

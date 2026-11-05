@@ -19,25 +19,22 @@ package io.parsingdata.metal.expression.value.reference;
 
 import static java.math.BigInteger.ZERO;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkContainsNoNulls;
 import static io.parsingdata.metal.Util.checkNotNull;
-import static io.parsingdata.metal.data.ImmutableList.create;
+import static io.parsingdata.metal.Util.prepend;
+import static io.parsingdata.metal.Util.reverse;
 import static io.parsingdata.metal.data.Selection.NO_LIMIT;
 import static io.parsingdata.metal.data.Selection.getAllValues;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.data.ParseValue;
 import io.parsingdata.metal.encoding.Encoding;
@@ -57,7 +54,7 @@ import io.parsingdata.metal.token.Token;
  */
 public abstract class Ref<T> extends ImmutableObject implements ValueExpression {
 
-    public final ImmutableList<T> references;
+    public final List<T> references;
     public final BiPredicate<ParseValue, T> predicate;
     public final SingleValueExpression limit;
     public final SingleValueExpression scope;
@@ -67,11 +64,10 @@ public abstract class Ref<T> extends ImmutableObject implements ValueExpression 
         this.predicate = checkNotNull(predicate, "predicate");
         this.limit = limit;
         this.scope = scope;
-        this.references = create(checkContainsNoNulls(references, "references"))
-            .add(checkNotNull(reference, "reference"));
+        this.references = prepend(checkNotNull(reference, "reference"), Arrays.asList(checkContainsNoNulls(references, "references")));
     }
 
-    private Ref(final BiPredicate<ParseValue, T> predicate, final SingleValueExpression limit, final SingleValueExpression scope, final ImmutableList<T> references) {
+    private Ref(final BiPredicate<ParseValue, T> predicate, final SingleValueExpression limit, final SingleValueExpression scope, final List<T> references) {
         this.predicate = checkNotNull(predicate, "predicate");
         this.limit = limit;
         this.scope = scope;
@@ -82,14 +78,14 @@ public abstract class Ref<T> extends ImmutableObject implements ValueExpression 
         public NameRef(final String reference, final String... references) { this(null, null, reference, references); }
         public NameRef(final SingleValueExpression limit, final String reference, final String... references) { this(limit, null, reference, references); }
         public NameRef(final SingleValueExpression limit, final SingleValueExpression scope, final String reference, final String... references) { super(ParseValue::matches, limit, scope, reference, references); }
-        private NameRef(final BiPredicate<ParseValue, String> predicate, final SingleValueExpression limit, final SingleValueExpression scope, final ImmutableList<String> references) { super(predicate, limit, scope, references); }
+        private NameRef(final BiPredicate<ParseValue, String> predicate, final SingleValueExpression limit, final SingleValueExpression scope, final List<String> references) { super(predicate, limit, scope, references); }
 
         @Override
-        protected ImmutableList<Value> evalImpl(final ParseState parseState, final int limit, final int requestedScope) {
+        protected List<Value> evalImpl(final ParseState parseState, final int limit, final int requestedScope) {
             return Optional.of(parseState.cache)
-                .filter(p -> references.size == 1)
+                .filter(p -> references.size() == 1)
                 .filter(p -> requestedScope >= parseState.order.scopeDepth)
-                .flatMap(p -> p.find(references.head, limit))
+                .flatMap(p -> p.find(references.get(0), limit))
                 .orElseGet(() -> super.evalImpl(parseState, limit, requestedScope));
         }
 
@@ -107,7 +103,7 @@ public abstract class Ref<T> extends ImmutableObject implements ValueExpression 
         public DefinitionRef(final Token reference, final Token... references) { this(null, null, reference, references); }
         public DefinitionRef(final SingleValueExpression limit, final Token reference, final Token... references) { this(limit, null, reference, references); }
         public DefinitionRef(final SingleValueExpression limit, final SingleValueExpression scope, final Token reference, final Token... references) { super(ParseValue::matches, limit, scope, reference, references); }
-        private DefinitionRef(final BiPredicate<ParseValue, Token> predicate, final SingleValueExpression limit, final SingleValueExpression scope, final ImmutableList<Token> references) { super(predicate, limit, scope, references); }
+        private DefinitionRef(final BiPredicate<ParseValue, Token> predicate, final SingleValueExpression limit, final SingleValueExpression scope, final List<Token> references) { super(predicate, limit, scope, references); }
 
         @Override
         public DefinitionRef withLimit(final SingleValueExpression limit) {
@@ -123,7 +119,7 @@ public abstract class Ref<T> extends ImmutableObject implements ValueExpression 
     public abstract Ref<T> withScope(final SingleValueExpression scope);
 
     @Override
-    public ImmutableList<Value> eval(final ParseState parseState, final Encoding encoding) {
+    public List<Value> eval(final ParseState parseState, final Encoding encoding) {
         final int requestedScope = scope == null ? parseState.order.scopeDepth : scope.evalSingle(parseState, encoding)
             .filter(sizeValue -> !sizeValue.equals(NOT_A_VALUE) && sizeValue.asNumeric().compareTo(ZERO) >= 0)
             .orElseThrow(() -> new IllegalArgumentException("Argument scopeSize must evaluate to a positive, countable value.")).asNumeric().intValueExact();
@@ -131,29 +127,12 @@ public abstract class Ref<T> extends ImmutableObject implements ValueExpression 
             return evalImpl(parseState, NO_LIMIT, requestedScope);
         }
         return limit.evalSingle(parseState, encoding)
-            .map(limitValue -> limitValue.equals(NOT_A_VALUE) ? create(NOT_A_VALUE) : evalImpl(parseState, limitValue.asNumeric().intValueExact(), requestedScope))
+            .map(limitValue -> limitValue.equals(NOT_A_VALUE) ? List.<Value>of(NOT_A_VALUE) : evalImpl(parseState, limitValue.asNumeric().intValueExact(), requestedScope))
             .orElseThrow(() -> new IllegalArgumentException("Limit must evaluate to a non-empty value."));
     }
 
-    protected ImmutableList<Value> evalImpl(final ParseState parseState, final int limit, final int requestedScope) {
-        return wrap(getAllValues(parseState.order, parseValue -> toList(references).stream().anyMatch(ref -> predicate.test(parseValue, ref)), limit, requestedScope, parseState.order.scopeDepth), new ImmutableList<Value>()).computeResult();
-    }
-
-    static <T> List<T> toList(final ImmutableList<T> allValues) {
-        final List<T> flatten = new ArrayList<>();
-        ImmutableList<T> tail = allValues;
-        while (!tail.isEmpty()) {
-            flatten.add(tail.head);
-            tail = tail.tail;
-        }
-        return flatten;
-    }
-
-    private static <T, U extends T> Trampoline<ImmutableList<T>> wrap(final ImmutableList<U> input, final ImmutableList<T> output) {
-        if (input.isEmpty()) {
-            return complete(() -> output);
-        }
-        return intermediate(() -> wrap(input.tail, output.add(input.head)));
+    protected List<Value> evalImpl(final ParseState parseState, final int limit, final int requestedScope) {
+        return reverse(getAllValues(parseState.order, parseValue -> references.stream().anyMatch(ref -> predicate.test(parseValue, ref)), limit, requestedScope, parseState.order.scopeDepth));
     }
 
     @Override

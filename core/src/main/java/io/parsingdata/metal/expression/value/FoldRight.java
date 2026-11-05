@@ -19,9 +19,9 @@ package io.parsingdata.metal.expression.value;
 
 import static io.parsingdata.metal.Shorthand.con;
 
+import java.util.List;
 import java.util.function.BinaryOperator;
 
-import io.parsingdata.metal.data.ImmutableList;
 
 /**
  * A {@link SingleValueExpression} implementation of the FoldRight operation.
@@ -38,7 +38,7 @@ public class FoldRight extends Fold {
     }
 
     @Override
-    protected ImmutableList<Value> prepareValues(final ImmutableList<Value> valueList) {
+    protected List<Value> prepareValues(final List<Value> valueList) {
         return valueList;
     }
 

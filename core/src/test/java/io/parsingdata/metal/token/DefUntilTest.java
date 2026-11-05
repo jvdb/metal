@@ -57,7 +57,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import io.parsingdata.metal.data.Environment;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.data.ParseValue;
 import io.parsingdata.metal.data.callback.Callback;
@@ -104,14 +103,14 @@ class DefUntilTest {
         final Optional<ParseState> parseState = rep(token).parse(env(stream(INPUT, US_ASCII)));
         assertTrue(parseState.isPresent());
 
-        ImmutableList<ParseValue> values = getAllValues(parseState.get().order, "line");
-        assertEquals(lineCount, values.size);
-        assertEquals(line1, values.tail.tail.head.asString());
-        assertEquals(line2, values.tail.head.asString());
-        assertEquals(line3, values.head.asString());
+        List<ParseValue> values = getAllValues(parseState.get().order, "line");
+        assertEquals(lineCount, values.size());
+        assertEquals(line1, values.get(2).asString());
+        assertEquals(line2, values.get(1).asString());
+        assertEquals(line3, values.get(0).asString());
 
-        ImmutableList<ParseValue> newLines = getAllValues(parseState.get().order, "newline");
-        assertEquals(newlineCount, newLines.size);
+        List<ParseValue> newLines = getAllValues(parseState.get().order, "newline");
+        assertEquals(newlineCount, newLines.size());
     }
 
     static Collection<Object[]> shorthandTokenTest() {
@@ -132,14 +131,14 @@ class DefUntilTest {
         final Optional<ParseState> parseState = rep(seq(token, NEWLINE)).parse(env(stream(INPUT, US_ASCII)));
         assertTrue(parseState.isPresent());
 
-        ImmutableList<ParseValue> values = getAllValues(parseState.get().order, "line");
-        assertEquals(3, values.size);
-        assertEquals(INPUT_1, values.tail.tail.head.asString());
-        assertEquals(INPUT_2, values.tail.head.asString());
-        assertEquals(INPUT_3, values.head.asString());
+        List<ParseValue> values = getAllValues(parseState.get().order, "line");
+        assertEquals(3, values.size());
+        assertEquals(INPUT_1, values.get(2).asString());
+        assertEquals(INPUT_2, values.get(1).asString());
+        assertEquals(INPUT_3, values.get(0).asString());
 
-        ImmutableList<ParseValue> newLines = getAllValues(parseState.get().order, "newline");
-        assertEquals(3, newLines.size);
+        List<ParseValue> newLines = getAllValues(parseState.get().order, "newline");
+        assertEquals(3, newLines.size());
     }
 
     static Collection<Object[]> shorthandExpressionTest() {
@@ -156,14 +155,14 @@ class DefUntilTest {
         final Optional<ParseState> parseState = rep(token).parse(env(stream(INPUT, US_ASCII)));
         assertTrue(parseState.isPresent());
 
-        ImmutableList<ParseValue> values = getAllValues(parseState.get().order, "line");
-        assertEquals(3, values.size);
-        assertEquals(INPUT_1 + "\n", values.tail.tail.head.asString());
-        assertEquals(INPUT_2 + "\n", values.tail.head.asString());
-        assertEquals(INPUT_3 + "\n", values.head.asString());
+        List<ParseValue> values = getAllValues(parseState.get().order, "line");
+        assertEquals(3, values.size());
+        assertEquals(INPUT_1 + "\n", values.get(2).asString());
+        assertEquals(INPUT_2 + "\n", values.get(1).asString());
+        assertEquals(INPUT_3 + "\n", values.get(0).asString());
 
-        ImmutableList<ParseValue> newLines = getAllValues(parseState.get().order, "newline");
-        assertEquals(0, newLines.size);
+        List<ParseValue> newLines = getAllValues(parseState.get().order, "newline");
+        assertEquals(0, newLines.size());
     }
 
     @Test
@@ -191,9 +190,9 @@ class DefUntilTest {
         final Token token = seq("struct", tokenProvider.apply(terminator), terminator);
         final Optional<ParseState> parse = token.parse(env(stream('d', 'a', 't', 'a', 0, 0)));
         assertTrue(parse.isPresent());
-        assertEquals(terminatorCount, getAllValues(parse.get().order, "struct.terminator").size);
-        assertEquals(1, getAllValues(parse.get().order, "struct.value").size);
-        assertEquals("data", getAllValues(parse.get().order, "struct.value").head.asString());
+        assertEquals(terminatorCount, getAllValues(parse.get().order, "struct.terminator").size());
+        assertEquals(1, getAllValues(parse.get().order, "struct.value").size());
+        assertEquals("data", getAllValues(parse.get().order, "struct.value").get(0).asString());
     }
 
     @Test
@@ -219,7 +218,7 @@ class DefUntilTest {
             () -> assertEquals(11, parse.get().offset.intValue()),
             () -> assertEquals(11, offsets.size()),
             () -> assertIterableEquals(List.of(0, 6, 12, 5, 10, 15, 7, 8, 9, 10, 11), offsets),
-            () -> assertEquals("01234567890", getAllValues(parse.get().order, "test").head.asString())
+            () -> assertEquals("01234567890", getAllValues(parse.get().order, "test").get(0).asString())
         );
     }
 

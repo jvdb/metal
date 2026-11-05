@@ -17,26 +17,27 @@
 
 package io.parsingdata.metal.data.callback;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
+import static io.parsingdata.metal.Util.prepend;
 
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
-import io.parsingdata.metal.Trampoline;
-import io.parsingdata.metal.data.ImmutableList;
-import io.parsingdata.metal.data.ImmutablePair;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.token.Token;
 
 public class Callbacks {
 
-    public static final Callbacks NONE = new Callbacks(null, new ImmutableList<>());
+    public static final Callbacks NONE = new Callbacks(null, List.of());
 
     public final Callback genericCallback;
-    public final ImmutableList<ImmutablePair<Token, Callback>> tokenCallbacks;
+    /**
+     * The callbacks for specific tokens, most recently added first.
+     */
+    public final List<Map.Entry<Token, Callback>> tokenCallbacks;
 
-    private Callbacks(final Callback genericCallback, final ImmutableList<ImmutablePair<Token, Callback>> tokenCallbacks) {
+    private Callbacks(final Callback genericCallback, final List<Map.Entry<Token, Callback>> tokenCallbacks) {
         this.genericCallback = genericCallback;
         this.tokenCallbacks = checkNotNull(tokenCallbacks, "tokenCallbacks");
     }
@@ -50,7 +51,7 @@ public class Callbacks {
     }
 
     public Callbacks add(final Token token, final Callback callback) {
-        return new Callbacks(genericCallback, tokenCallbacks.add(new ImmutablePair<>(token, callback)));
+        return new Callbacks(genericCallback, prepend(Map.entry(token, callback), tokenCallbacks));
     }
 
     public static Consumer<Callback> success(final Token token, final ParseState before, final ParseState after) {
@@ -65,17 +66,11 @@ public class Callbacks {
         if (genericCallback != null) {
             handler.accept(genericCallback);
         }
-        handleCallbacks(tokenCallbacks, token, handler).computeResult();
-    }
-
-    private Trampoline<Void> handleCallbacks(final ImmutableList<ImmutablePair<Token, Callback>> callbacks, final Token token, final Consumer<Callback> handler) {
-        if (callbacks.isEmpty()) {
-            return complete(() -> null);
+        for (final Map.Entry<Token, Callback> tokenCallback : tokenCallbacks) {
+            if (tokenCallback.getKey().equals(token)) {
+                handler.accept(tokenCallback.getValue());
+            }
         }
-        if (callbacks.head.left.equals(token)) {
-            handler.accept(callbacks.head.right);
-        }
-        return intermediate(() -> handleCallbacks(callbacks.tail, token, handler));
     }
 
     @Override

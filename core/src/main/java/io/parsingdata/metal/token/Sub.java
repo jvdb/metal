@@ -17,9 +17,8 @@
 
 package io.parsingdata.metal.token;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
+import static io.parsingdata.metal.Util.failure;
 import static io.parsingdata.metal.Util.success;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
@@ -27,10 +26,8 @@ import java.math.BigInteger;
 import java.util.Objects;
 import java.util.Optional;
 
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
 import io.parsingdata.metal.data.Environment;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseReference;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
@@ -64,25 +61,23 @@ public class Sub extends CycleToken {
 
     @Override
     protected Optional<ParseState> parseImpl(final Environment environment) {
-        return iterate(environment.addBranch(this), offsets.eval(environment.parseState, environment.encoding)).computeResult()
-            .flatMap(nextParseState -> nextParseState.seek(environment.parseState.offset));
-    }
-
-    private Trampoline<Optional<ParseState>> iterate(final Environment environment, final ImmutableList<Value> offsetList) {
-        if (offsetList.isEmpty()) {
-            return complete(() -> success(environment.parseState.closeBranch(this)));
+        Environment currentEnvironment = environment.addBranch(this);
+        for (final Value offset : offsets.eval(environment.parseState, environment.encoding)) {
+            if (offset.equals(NOT_A_VALUE)) {
+                return failure();
+            }
+            final Optional<ParseState> result = parse(currentEnvironment, offset.asNumeric());
+            if (result.isEmpty()) {
+                return failure();
+            }
+            currentEnvironment = currentEnvironment.withParseState(result.get());
         }
-        if (offsetList.head.equals(NOT_A_VALUE)) {
-            return complete(Util::failure);
-        }
-        return parse(environment, offsetList.head.asNumeric())
-            .map(nextParseState -> intermediate(() -> iterate(environment.withParseState(nextParseState), offsetList.tail)))
-            .orElseGet(() -> complete(Util::failure));
+        return currentEnvironment.parseState.closeBranch(this).seek(environment.parseState.offset);
     }
 
     private Optional<ParseState> parse(final Environment environment, final BigInteger offsetValue) {
         final ParseReference parseReference = new ParseReference(offsetValue, environment.parseState.source, token.getCanonical(environment.parseState));
-        if (environment.parseState.references.contains(parseReference)) {
+        if (environment.parseState.containsReference(parseReference)) {
             return success(environment.parseState.createCycle(parseReference));
         }
         return environment.parseState

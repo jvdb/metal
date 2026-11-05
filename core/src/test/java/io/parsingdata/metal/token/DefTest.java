@@ -80,7 +80,7 @@ public class DefTest {
         final Environment environment = new Environment(state, enc());
 
         final ParseState result = def.parse(environment).get();
-        final ParseValue data = Selection.getAllValues(result.order, any -> true, 1).head;
+        final ParseValue data = Selection.getAllValues(result.order, any -> true, 1).get(0);
 
         assertThat(data.slice().offset, is(equalTo(BigInteger.ONE)));
         assertThat(data.slice().length, is(equalTo(BigInteger.valueOf(Long.MAX_VALUE))));

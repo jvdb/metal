@@ -29,7 +29,7 @@ import static io.parsingdata.metal.util.ParseStateFactory.stream;
 
 import org.junit.jupiter.api.Test;
 
-import io.parsingdata.metal.data.ImmutableList;
+import java.util.List;
 
 public class ValueExpressionEvalEmptyTest {
 
@@ -49,9 +49,9 @@ public class ValueExpressionEvalEmptyTest {
     }
 
     private void parse(final ValueExpression expression) {
-        final ImmutableList<Value> result = expression.eval(stream(0), enc());
-        assertEquals(1, result.size);
-        assertEquals(NOT_A_VALUE, result.head);
+        final List<Value> result = expression.eval(stream(0), enc());
+        assertEquals(1, result.size());
+        assertEquals(NOT_A_VALUE, result.get(0));
     }
 
 }

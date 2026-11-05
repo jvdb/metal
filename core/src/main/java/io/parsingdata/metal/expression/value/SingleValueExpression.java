@@ -17,9 +17,9 @@
 
 package io.parsingdata.metal.expression.value;
 
+import java.util.List;
 import java.util.Optional;
 
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 
@@ -40,10 +40,10 @@ public interface SingleValueExpression extends ValueExpression {
     Optional<Value> evalSingle(ParseState parseState, Encoding encoding);
 
     @Override
-    default ImmutableList<Value> eval(ParseState parseState, Encoding encoding) {
+    default List<Value> eval(ParseState parseState, Encoding encoding) {
         return evalSingle(parseState, encoding)
-            .map(ImmutableList::create)
-            .orElseGet(ImmutableList::new);
+            .map(List::of)
+            .orElseGet(List::of);
     }
 
 }

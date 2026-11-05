@@ -17,14 +17,17 @@
 
 package io.parsingdata.metal.expression.value;
 
+import static java.util.Collections.unmodifiableList;
+
 import static io.parsingdata.metal.Util.checkContainsNoNulls;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 import io.parsingdata.metal.ImmutableObject;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 
@@ -43,11 +46,17 @@ public class Join extends ImmutableObject implements ValueExpression {
         this.expressions = checkContainsNoNulls(expressions, "expression");
     }
 
+    /**
+     * Returns the values of all expressions. Just like values are ordered from most to least recent, the values of
+     * the last expression come first.
+     */
     @Override
-    public ImmutableList<Value> eval(final ParseState parseState, final Encoding encoding) {
-        return Arrays.stream(expressions)
-            .map(e -> e.eval(parseState, encoding))
-            .reduce(new ImmutableList<>(), ImmutableList::add, ImmutableList::add);
+    public List<Value> eval(final ParseState parseState, final Encoding encoding) {
+        final List<Value> result = new ArrayList<>();
+        for (int i = expressions.length - 1; i >= 0; i--) {
+            result.addAll(expressions[i].eval(parseState, encoding));
+        }
+        return unmodifiableList(result);
     }
 
     @Override

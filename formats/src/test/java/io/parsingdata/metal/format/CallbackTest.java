@@ -17,34 +17,33 @@
 
 package io.parsingdata.metal.format;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 import static io.parsingdata.metal.Shorthand.con;
 import static io.parsingdata.metal.Util.inflate;
 import static io.parsingdata.metal.format.Callback.crc32;
 import static io.parsingdata.metal.util.EncodingFactory.enc;
 import static io.parsingdata.metal.util.ParseStateFactory.stream;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.junit.jupiter.api.Test;
+import java.util.List;
 
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.expression.value.Value;
+import org.junit.jupiter.api.Test;
 
 public class CallbackTest {
 
     @Test
     public void crc32Good() {
-        final ImmutableList<Value> result = crc32(con(0x01020304)).eval(stream(), enc());
-        assertEquals(1, result.size);
-        assertArrayEquals(new byte[] { -74, 60, -5, -51 }, result.head.value());
+        final List<Value> result = crc32(con(0x01020304)).eval(stream(), enc());
+        assertEquals(1, result.size());
+        assertArrayEquals(new byte[] { -74, 60, -5, -51 }, result.get(0).value());
     }
 
     @Test
     public void inflateGood() {
-        final ImmutableList<Value> result = inflate(con(0xcb, 0x4d, 0x2d, 0x49, 0xcc, 0x01, 0x00)).eval(stream(), enc());
-        assertEquals(1, result.size);
-        assertEquals("metal", result.head.asString());
+        final List<Value> result = inflate(con(0xcb, 0x4d, 0x2d, 0x49, 0xcc, 0x01, 0x00)).eval(stream(), enc());
+        assertEquals(1, result.size());
+        assertEquals("metal", result.get(0).asString());
     }
 
 }

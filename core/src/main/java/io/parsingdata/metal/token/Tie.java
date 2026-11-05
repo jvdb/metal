@@ -17,20 +17,17 @@
 
 package io.parsingdata.metal.token;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
+import static io.parsingdata.metal.Util.failure;
 import static io.parsingdata.metal.Util.success;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import io.parsingdata.metal.Trampoline;
-import io.parsingdata.metal.Util;
 import io.parsingdata.metal.data.DataExpressionSource;
 import io.parsingdata.metal.data.Environment;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 import io.parsingdata.metal.expression.value.Value;
@@ -63,19 +60,20 @@ public class Tie extends Token {
 
     @Override
     protected Optional<ParseState> parseImpl(final Environment environment) {
-        return iterate(environment.addBranch(this), dataExpression.eval(environment.parseState, environment.encoding), 0, environment.parseState).computeResult();
-    }
-
-    private Trampoline<Optional<ParseState>> iterate(final Environment environment, final ImmutableList<Value> values, final int index, final ParseState returnParseState) {
-        if (values.isEmpty()) {
-            return complete(() -> success(new ParseState(environment.parseState.closeBranch(this).order, environment.parseState.cache, returnParseState.source, returnParseState.offset, returnParseState.iterations, returnParseState.references)));
+        final List<Value> values = dataExpression.eval(environment.parseState, environment.encoding);
+        final ParseState returnParseState = environment.parseState;
+        Environment currentEnvironment = environment.addBranch(this);
+        for (int index = 0; index < values.size(); index++) {
+            if (values.get(index).equals(NOT_A_VALUE)) {
+                return failure();
+            }
+            final Optional<ParseState> result = token.parse(currentEnvironment.withParseState(currentEnvironment.parseState.withSource(new DataExpressionSource(dataExpression, index, currentEnvironment.parseState, currentEnvironment.encoding))));
+            if (result.isEmpty()) {
+                return failure();
+            }
+            currentEnvironment = currentEnvironment.withParseState(result.get());
         }
-        if (values.head.equals(NOT_A_VALUE)) {
-            return complete(Util::failure);
-        }
-        return token.parse(environment.withParseState(environment.parseState.withSource(new DataExpressionSource(dataExpression, index, environment.parseState, environment.encoding))))
-                .map(nextParseState -> intermediate(() -> iterate(environment.withParseState(nextParseState), values.tail, index + 1, returnParseState)))
-                .orElseGet(() -> complete(Util::failure));
+        return success(returnParseState.withOrder(currentEnvironment.parseState.closeBranch(this).order, currentEnvironment.parseState.cache));
     }
 
     @Override

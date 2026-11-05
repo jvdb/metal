@@ -71,7 +71,7 @@ public class SubStructTest {
         final Optional<ParseState> result = LINKED_LIST.parse(env(parseState, enc()));
         assertTrue(result.isPresent());
         final ParseGraph graph = result.get().order;
-        assertEquals(0, getReferences(graph).size); // No cycles
+        assertEquals(0, getReferences(graph).size()); // No cycles
 
         final ParseGraph first = graph.head.asGraph();
         checkBranch(first, 0, 8);
@@ -89,7 +89,7 @@ public class SubStructTest {
         final Optional<ParseState> result = LINKED_LIST.parse(env(parseState, enc()));
         assertTrue(result.isPresent());
         final ParseGraph graph = result.get().order;
-        assertEquals(1, getReferences(graph).size);
+        assertEquals(1, getReferences(graph).size());
 
         final ParseGraph first = graph.head.asGraph();
         checkBranch(first, 0, 0);
@@ -102,7 +102,7 @@ public class SubStructTest {
         final ParseState parseState = stream(0, 4, 1, 21, 0, 0, 1).seek(BigInteger.valueOf(offset)).get();
         final Optional<ParseState> result = LINKED_LIST.parse(env(parseState, enc()));
         assertTrue(result.isPresent());
-        assertEquals(1, getReferences(result.get().order).size);
+        assertEquals(1, getReferences(result.get().order).size());
         return result.get().order;
     }
 

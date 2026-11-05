@@ -17,25 +17,18 @@
 
 package io.parsingdata.metal.expression.value.reference;
 
-import static java.math.BigInteger.ONE;
 import static java.math.BigInteger.ZERO;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
 import static io.parsingdata.metal.encoding.Encoding.DEFAULT_ENCODING;
 import static io.parsingdata.metal.expression.value.ConstantFactory.createFromNumeric;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
-import java.math.BigInteger;
 import java.util.Objects;
 import java.util.Optional;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
-import io.parsingdata.metal.data.ImmutablePair;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 import io.parsingdata.metal.expression.value.SingleValueExpression;
@@ -69,17 +62,10 @@ public class CurrentIteration extends ImmutableObject implements SingleValueExpr
         if (levelValue.isEmpty() || levelValue.get().equals(NOT_A_VALUE) || levelValue.get().asNumeric().compareTo(ZERO) < 0) {
             return Optional.of(NOT_A_VALUE);
         }
-        if (parseState.iterations.size <= levelValue.get().asNumeric().longValueExact()) {
+        if (parseState.iterations.size() <= levelValue.get().asNumeric().longValueExact()) {
             return Optional.empty();
         }
-        return getIterationRecursive(parseState.iterations, levelValue.get().asNumeric()).computeResult();
-    }
-
-    private Trampoline<Optional<Value>> getIterationRecursive(final ImmutableList<ImmutablePair<Token, BigInteger>> iterations, final BigInteger levelValue) {
-        if (levelValue.compareTo(ZERO) == 0) {
-            return complete(() -> Optional.of(createFromNumeric(iterations.head.right, DEFAULT_ENCODING)));
-        }
-        return intermediate(() -> getIterationRecursive(iterations.tail, levelValue.subtract(ONE)));
+        return Optional.of(createFromNumeric(parseState.iterations.get(levelValue.get().asNumeric().intValueExact()).getValue(), DEFAULT_ENCODING));
     }
 
     @Override

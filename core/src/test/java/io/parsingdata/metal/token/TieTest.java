@@ -48,13 +48,13 @@ import static io.parsingdata.metal.util.EnvironmentFactory.env;
 import static io.parsingdata.metal.util.ParseStateFactory.stream;
 import static io.parsingdata.metal.util.TokenDefinitions.any;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.zip.Deflater;
 
 import org.junit.jupiter.api.Test;
 
 import io.parsingdata.metal.Shorthand;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.data.ParseValue;
 import io.parsingdata.metal.expression.value.ValueExpression;
@@ -79,7 +79,7 @@ public class TieTest {
     public void smallContainer() {
         final Optional<ParseState> result = parseContainer();
         assertEquals(5, result.get().offset.intValueExact());
-        assertEquals(6, getAllValues(result.get().order, "value").size);
+        assertEquals(6, getAllValues(result.get().order, "value").size());
     }
 
     private Optional<ParseState> parseContainer() {
@@ -91,7 +91,7 @@ public class TieTest {
     @Test
     public void checkContainerSource() {
         final Optional<ParseState> result = parseContainer();
-        checkFullParse(INC_PREV_MOD_100, fold(ref("value"), Shorthand::cat).eval(result.get(), enc()).head.value());
+        checkFullParse(INC_PREV_MOD_100, fold(ref("value"), Shorthand::cat).eval(result.get(), enc()).get(0).value());
     }
 
     private Optional<ParseState> checkFullParse(Token token, byte[] data) {
@@ -177,7 +177,7 @@ public class TieTest {
                 sub(SIMPLE_SEQ, con(0)));
         final Optional<ParseState> result = nestedSeq.parse(env(stream(1, 2, 3)));
         assertTrue(result.isPresent());
-        assertEquals(0, getReferences(result.get().order).size);
+        assertEquals(0, getReferences(result.get().order).size());
     }
 
     @Test
@@ -188,11 +188,11 @@ public class TieTest {
                 tie(SIMPLE_SEQ, ref("d")));
         final Optional<ParseState> result = multiTie.parse(env(stream(1, 2, 3, 1, 2, 3)));
         assertTrue(result.isPresent());
-        assertEquals(0, getReferences(result.get().order).size);
+        assertEquals(0, getReferences(result.get().order).size());
         final String[] names = { "a", "b", "c", "d" };
         for (String name : names) {
-            ImmutableList<ParseValue> values = getAllValues(result.get().order, name);
-            assertEquals(2, values.size);
+            List<ParseValue> values = getAllValues(result.get().order, name);
+            assertEquals(2, values.size());
         }
     }
 
@@ -205,12 +205,12 @@ public class TieTest {
                 tie(SIMPLE_SEQ, refD));
         final Optional<ParseState> result = duplicateTie.parse(env(stream(1, 2, 3)));
         assertTrue(result.isPresent());
-        assertEquals(0, getReferences(result.get().order).size);
-        assertEquals(1, getAllValues(result.get().order, "d").size);
+        assertEquals(0, getReferences(result.get().order).size());
+        assertEquals(1, getAllValues(result.get().order, "d").size());
         final String[] names = { "a", "b", "c" };
         for (String name : names) {
-            ImmutableList<ParseValue> values = getAllValues(result.get().order, name);
-            assertEquals(2, values.size);
+            List<ParseValue> values = getAllValues(result.get().order, name);
+            assertEquals(2, values.size());
         }
     }
 

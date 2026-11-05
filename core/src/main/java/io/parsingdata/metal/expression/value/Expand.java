@@ -17,17 +17,17 @@
 
 package io.parsingdata.metal.expression.value;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
+import static java.util.Collections.unmodifiableList;
+
 import static io.parsingdata.metal.Util.checkNotNull;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 
@@ -54,22 +54,23 @@ public class Expand extends ImmutableObject implements ValueExpression {
     }
 
     @Override
-    public ImmutableList<Value> eval(final ParseState parseState, final Encoding encoding) {
-        final ImmutableList<Value> baseList = bases.eval(parseState, encoding);
+    public List<Value> eval(final ParseState parseState, final Encoding encoding) {
+        final List<Value> baseList = bases.eval(parseState, encoding);
         if (baseList.isEmpty()) {
             return baseList;
         }
         return count.evalSingle(parseState, encoding)
             .filter(countValue -> !countValue.equals(NOT_A_VALUE))
-            .map(countValue -> expand(baseList, countValue.asNumeric().intValueExact(), new ImmutableList<>()).computeResult())
+            .map(countValue -> expand(baseList, countValue.asNumeric().intValueExact()))
             .orElseThrow(() -> new IllegalArgumentException("Count must evaluate to a non-empty countable value."));
     }
 
-    private Trampoline<ImmutableList<Value>> expand(final ImmutableList<Value> baseList, final int countValue, final ImmutableList<Value> aggregate) {
-        if (countValue < 1) {
-            return complete(() -> aggregate);
+    private List<Value> expand(final List<Value> baseList, final int countValue) {
+        final List<Value> result = new ArrayList<>();
+        for (int i = 0; i < countValue; i++) {
+            result.addAll(baseList);
         }
-        return intermediate(() -> expand(baseList, countValue - 1, aggregate.add(baseList)));
+        return unmodifiableList(result);
     }
 
     @Override

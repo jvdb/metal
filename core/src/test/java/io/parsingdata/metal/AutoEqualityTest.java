@@ -77,8 +77,6 @@ import io.parsingdata.metal.data.ConcatenatedValueSource;
 import io.parsingdata.metal.data.ConstantSource;
 import io.parsingdata.metal.data.DataExpressionSource;
 import io.parsingdata.metal.data.Environment;
-import io.parsingdata.metal.data.ImmutableList;
-import io.parsingdata.metal.data.ImmutablePair;
 import io.parsingdata.metal.data.ParseGraph;
 import io.parsingdata.metal.data.ParseItem;
 import io.parsingdata.metal.data.ParseReference;
@@ -169,7 +167,7 @@ public class AutoEqualityTest {
         io.parsingdata.metal.expression.logical.Not.class,
         // Data structures
         CoreValue.class, ParseValue.class, ParseReference.class, ParseState.class,
-        NotAValue.class, ParseGraph.class, ImmutableList.class,
+        NotAValue.class, ParseGraph.class,
         ParseValueCache.class,
         // Inputs
         Slice.class,
@@ -179,13 +177,16 @@ public class AutoEqualityTest {
     private static final Set<Class<?>> CLASSES_TO_IGNORE = Set.of(
         // Handled indirectly through DefinitionRef and NameRef.
         Ref.class,
-        // Handled in EqualityTest manually.
-        ImmutablePair.class,
         // Utility classes.
         Selection.class, ConstantFactory.class,
         // Multiple constructors
         Environment.class
     );
+
+    // These classes have private constructors that take lists shared between instances together with the number of
+    // elements each instance uses. Arbitrary combinations of arguments are invalid, so only the other constructors are
+    // used for these classes.
+    private static final Set<Class<?>> PRIVATE_CONSTRUCTORS_TO_IGNORE = Set.of(ParseState.class, ParseValueCache.class);
 
     public static final Object OTHER_TYPE = new Object() {};
 
@@ -219,9 +220,9 @@ public class AutoEqualityTest {
     private static final List<Supplier<Object>> PARSE_ITEMS = List.of(() -> CLOSED_BRANCHED_GRAPH, () -> ParseGraph.EMPTY, () -> GRAPH_WITH_REFERENCE, () -> createFromByteStream(DUMMY_STREAM).add(PARSE_VALUE).order, () -> createFromByteStream(DUMMY_STREAM).add(PARSE_VALUE).add(PARSE_VALUE).order, () -> BRANCHED_GRAPH);
     private static final List<Supplier<Object>> BYTE_STREAMS = List.of(() -> new InMemoryByteStream(new byte[] { 1, 2 }), () -> DUMMY_STREAM);
     private static final List<Supplier<Object>> BIG_INTEGERS = List.of(() -> ONE, () -> BigInteger.valueOf(3));
-    private static final List<Supplier<Object>> PARSE_STATES = List.of(() -> createFromByteStream(DUMMY_STREAM), () -> createFromByteStream(DUMMY_STREAM, ONE), () -> new ParseState(GRAPH_WITH_REFERENCE, NO_CACHE, DUMMY_BYTE_STREAM_SOURCE, TEN, new ImmutableList<>(), new ImmutableList<>()));
+    private static final List<Supplier<Object>> PARSE_STATES = List.of(() -> createFromByteStream(DUMMY_STREAM), () -> createFromByteStream(DUMMY_STREAM, ONE), () -> new ParseState(GRAPH_WITH_REFERENCE, NO_CACHE, DUMMY_BYTE_STREAM_SOURCE, TEN, List.of(), List.of()));
     private static final List<Supplier<Object>> PARSE_VALUE_CACHES = List.of(() -> NO_CACHE, ParseValueCache::new, () -> new ParseValueCache().add(PARSE_VALUE), () -> new ParseValueCache().add(PARSE_VALUE).add(PARSE_VALUE));
-    private static final List<Supplier<Object>> IMMUTABLE_LISTS = List.of(ImmutableList::new, () -> ImmutableList.create("TEST"), () -> ImmutableList.create(1), () -> ImmutableList.create(1).add(2));
+    private static final List<Supplier<Object>> LISTS = List.of(List::of, () -> List.of("TEST"), () -> List.of(1), () -> List.of(2, 1));
     private static final List<Supplier<Object>> BOOLEANS = List.of(() -> true, () -> false);
     private static final List<Supplier<Object>> BIPREDICATES = List.of(() -> (BiPredicate<Object, Object>) (o, o2) -> false);
     private static final List<Supplier<Object>> MAPS = List.of(Map::of, () -> Map.of("1", 1, "2", 2));
@@ -251,7 +252,7 @@ public class AutoEqualityTest {
         result.put(BigInteger.class, BIG_INTEGERS);
         result.put(ParseState.class, PARSE_STATES);
         result.put(ParseValueCache.class, PARSE_VALUE_CACHES);
-        result.put(ImmutableList.class, IMMUTABLE_LISTS);
+        result.put(List.class, LISTS);
         result.put(boolean.class, BOOLEANS);
         result.put(BiPredicate.class, BIPREDICATES);
         result.put(Map.class, MAPS);
@@ -325,6 +326,9 @@ public class AutoEqualityTest {
             final boolean containsGenericArgument = Arrays.stream(cons.getParameterTypes()).anyMatch(p -> p == Object.class);
             if (containsGenericArgument) {
                 break;
+            }
+            if (Modifier.isPrivate(cons.getModifiers()) && PRIVATE_CONSTRUCTORS_TO_IGNORE.contains(c)) {
+                continue;
             }
             cons.setAccessible(true);
             final List<List<Supplier<Object>>> args = new ArrayList<>();

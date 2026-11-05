@@ -1,25 +1,29 @@
 package io.parsingdata.metal.data;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
-import static io.parsingdata.metal.data.Selection.NO_LIMIT;
-import static io.parsingdata.metal.data.Selection.reverse;
+import static java.util.Collections.unmodifiableList;
 
+import static io.parsingdata.metal.Util.appendShared;
+import static io.parsingdata.metal.Util.sharedPrefix;
+import static io.parsingdata.metal.data.Selection.NO_LIMIT;
+
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
 import io.parsingdata.metal.expression.value.Value;
 import io.parsingdata.metal.token.Token;
-
 public class ParseValueCache {
 
-    public static final ParseValueCache NO_CACHE = new ParseValueCache(null);
+    public static final ParseValueCache NO_CACHE = new ParseValueCache(null, null);
 
-    private final Map<String, ImmutableList<ParseValue>> cache;
+    // Per short name, a list of values in the order they were added. These lists are shared between caches and only
+    // grow (see Util.appendShared), so each cache stores how many elements of each list belong to it in sizes.
+    private final Map<String, List<ParseValue>> cache;
+    private final Map<String, Integer> sizes;
 
     /**
      * Start a cache that keeps track of values added to the parse graph.
@@ -27,31 +31,37 @@ public class ParseValueCache {
      * In case no caching is desired, {@link #NO_CACHE} should be used instead.
      */
     public ParseValueCache() {
-        this(new HashMap<>());
+        this(new HashMap<>(), new HashMap<>());
     }
 
     // For internal use only. It is private to avoid setting the cache to null. The NO_CACHE constant should be used instead.
-    private ParseValueCache(final Map<String, ImmutableList<ParseValue>> cache) {
+    private ParseValueCache(final Map<String, List<ParseValue>> cache, final Map<String, Integer> sizes) {
         this.cache = cache;
+        this.sizes = sizes;
     }
 
-    public Optional<ImmutableList<Value>> find(final String scopeName, int limit) {
+    /**
+     * Find the values matching the scopeName, ordered from the most recently added to the least recently added.
+     */
+    public Optional<List<Value>> find(final String scopeName, final int limit) {
         if (this == NO_CACHE) {
             return Optional.empty();
         }
-        final ImmutableList<Value> result = find(cache.getOrDefault(shortName(scopeName), new ImmutableList<>()), scopeName, limit, new ImmutableList<>()).computeResult();
-        return Optional.of(reverse(result));
-    }
-
-    private Trampoline<ImmutableList<Value>> find(final ImmutableList<ParseValue> searchList, final String scopeName, final int limit, final ImmutableList<Value> result) {
-        if (searchList.isEmpty() || (limit != NO_LIMIT && result.size == limit)) {
-            return complete(() -> result);
+        final String name = shortName(scopeName);
+        final List<ParseValue> values = cache.get(name);
+        if (values == null) {
+            return Optional.of(List.of());
         }
-        final ParseValue head = searchList.head;
-        if (head.matches(scopeName)) {
-            return intermediate(() -> find(searchList.tail, scopeName, limit, result.add(head)));
+        final List<Value> result = new ArrayList<>();
+        synchronized (values) {
+            for (int i = sizes.get(name) - 1; i >= 0 && (limit == NO_LIMIT || result.size() < limit); i--) {
+                final ParseValue value = values.get(i);
+                if (value.matches(scopeName)) {
+                    result.add(value);
+                }
+            }
         }
-        return intermediate(() -> find(searchList.tail, scopeName, limit, result));
+        return Optional.of(unmodifiableList(result));
     }
 
     public ParseValueCache add(final ParseValue value) {
@@ -59,14 +69,25 @@ public class ParseValueCache {
             return NO_CACHE;
         }
         final String name = shortName(value.name);
-        final Map<String, ImmutableList<ParseValue>> stringImmutableListHashMap = new HashMap<>(cache);
-        stringImmutableListHashMap.computeIfAbsent(name, pattern -> new ImmutableList<>());
-        stringImmutableListHashMap.computeIfPresent(name, (pattern, valueImmutableList) -> valueImmutableList.add(value));
-        return new ParseValueCache(stringImmutableListHashMap);
+        final int size = sizes.getOrDefault(name, 0);
+        final Map<String, List<ParseValue>> newCache = new HashMap<>(cache);
+        newCache.put(name, appendShared(cache.get(name), size, value));
+        final Map<String, Integer> newSizes = new HashMap<>(sizes);
+        newSizes.put(name, size + 1);
+        return new ParseValueCache(newCache, newSizes);
     }
 
     private static String shortName(final String name) {
         return name.substring(name.lastIndexOf(Token.SEPARATOR) + 1);
+    }
+
+    private Map<String, List<ParseValue>> contents() {
+        if (this == NO_CACHE) {
+            return null;
+        }
+        final Map<String, List<ParseValue>> contents = new HashMap<>();
+        cache.forEach((name, values) -> contents.put(name, sharedPrefix(values, sizes.get(name))));
+        return contents;
     }
 
     @Override
@@ -80,11 +101,11 @@ public class ParseValueCache {
     @Override
     public boolean equals(final Object obj) {
         return Util.notNullAndSameClass(this, obj)
-            && Objects.equals(cache, ((ParseValueCache)obj).cache);
+            && Objects.equals(contents(), ((ParseValueCache)obj).contents());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(cache);
+        return Objects.hash(contents());
     }
 }

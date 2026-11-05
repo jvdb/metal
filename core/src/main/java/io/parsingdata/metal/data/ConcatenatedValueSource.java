@@ -20,34 +20,39 @@ package io.parsingdata.metal.data;
 import static java.math.BigInteger.ZERO;
 import static java.math.BigInteger.valueOf;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNegative;
 import static io.parsingdata.metal.Util.checkNotNull;
 import static io.parsingdata.metal.Util.format;
-import static io.parsingdata.metal.data.Selection.reverse;
+import static io.parsingdata.metal.Util.reverse;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
 import io.parsingdata.metal.expression.value.Value;
 
 public class ConcatenatedValueSource extends Source {
 
-    public final ImmutableList<Value> values;
+    /**
+     * The values to concatenate, in the order in which their data appears in this source.
+     */
+    public final List<Value> values;
     public final BigInteger length;
 
-    private ConcatenatedValueSource(final ImmutableList<Value> values, final BigInteger length) {
+    private ConcatenatedValueSource(final List<Value> values, final BigInteger length) {
         this.values = checkNotNull(values, "values");
         this.length = checkNotNegative(length, "length");
     }
 
-    public static Optional<ConcatenatedValueSource> create(final ImmutableList<Value> inputValues) {
-        final ImmutableList<Value> values = reverse(inputValues);
+    /**
+     * Create a source from the data of the values. The values are concatenated in reverse order: the data of the
+     * last value in the list comes first.
+     */
+    public static Optional<ConcatenatedValueSource> create(final List<Value> inputValues) {
+        final List<Value> values = reverse(inputValues);
         final BigInteger length = calculateTotalSize(values);
         if (length.compareTo(ZERO) == 0) {
             return Optional.empty();
@@ -55,18 +60,15 @@ public class ConcatenatedValueSource extends Source {
         return Optional.of(new ConcatenatedValueSource(values, length));
     }
 
-    private static BigInteger calculateTotalSize(final ImmutableList<Value> values) {
-        return calculateTotalSize(values, ZERO).computeResult();
-    }
-
-    private static Trampoline<BigInteger> calculateTotalSize(final ImmutableList<Value> values, final BigInteger size) {
-        if (values.isEmpty()) {
-            return complete(() -> size);
+    private static BigInteger calculateTotalSize(final List<Value> values) {
+        BigInteger size = ZERO;
+        for (final Value value : values) {
+            if (value.equals(NOT_A_VALUE)) {
+                return ZERO;
+            }
+            size = size.add(value.slice().length);
         }
-        if (values.head.equals(NOT_A_VALUE)) {
-            return complete(() -> ZERO);
-        }
-        return intermediate(() -> calculateTotalSize(values.tail, size.add(values.head.slice().length)));
+        return size;
     }
 
     @Override
@@ -74,22 +76,24 @@ public class ConcatenatedValueSource extends Source {
         if (!isAvailable(offset, length)) {
             throw new IllegalStateException(format("Data to read is not available (offset=%d;length=%d;source=%s).", offset, length, this));
         }
-        return getData(values, ZERO, ZERO, offset, length, new byte[length.intValueExact()]).computeResult();
-    }
-
-    private Trampoline<byte[]> getData(final ImmutableList<Value> values, final BigInteger currentOffset, final BigInteger currentDest, final BigInteger offset, final BigInteger length, final byte[] output) {
-        if (length.compareTo(ZERO) <= 0) {
-            return complete(() -> output);
+        final byte[] output = new byte[length.intValueExact()];
+        BigInteger currentOffset = ZERO;
+        BigInteger currentDest = ZERO;
+        BigInteger remaining = length;
+        for (int i = 0; remaining.compareTo(ZERO) > 0; i++) {
+            final Value value = values.get(i);
+            final BigInteger nextOffset = currentOffset.add(value.slice().length);
+            if (nextOffset.compareTo(offset) > 0) {
+                final BigInteger localOffset = offset.subtract(currentOffset).compareTo(ZERO) < 0 ? ZERO : offset.subtract(currentOffset);
+                // The second argument in getData in Slice is a limit. It will return less if the end of slice is reached.
+                final byte[] data = value.slice().getData(localOffset, remaining);
+                System.arraycopy(data, 0, output, currentDest.intValueExact(), data.length);
+                currentDest = currentDest.add(valueOf(data.length));
+                remaining = remaining.subtract(valueOf(data.length));
+            }
+            currentOffset = nextOffset;
         }
-        final BigInteger nextOffset = currentOffset.add(values.head.slice().length);
-        if (nextOffset.compareTo(offset) <= 0) {
-            return intermediate(() -> getData(values.tail, nextOffset, currentDest, offset, length, output));
-        }
-        final BigInteger localOffset = offset.subtract(currentOffset).compareTo(ZERO) < 0 ? ZERO : offset.subtract(currentOffset);
-        // The second argument in getData in Slice is a limit. It will return less if the end of slice is reached.
-        final byte[] data = values.head.slice().getData(localOffset, length);
-        System.arraycopy(data, 0, output, currentDest.intValueExact(), data.length);
-        return intermediate(() -> getData(values.tail, nextOffset, currentDest.add(valueOf(data.length)), offset, length.subtract(valueOf(data.length)), output));
+        return output;
     }
 
     @Override

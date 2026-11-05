@@ -17,19 +17,16 @@
 
 package io.parsingdata.metal.expression.value;
 
-import static io.parsingdata.metal.Trampoline.complete;
-import static io.parsingdata.metal.Trampoline.intermediate;
 import static io.parsingdata.metal.Util.checkNotNull;
 import static io.parsingdata.metal.expression.value.NotAValue.NOT_A_VALUE;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BinaryOperator;
 
 import io.parsingdata.metal.ImmutableObject;
-import io.parsingdata.metal.Trampoline;
 import io.parsingdata.metal.Util;
-import io.parsingdata.metal.data.ImmutableList;
 import io.parsingdata.metal.data.ParseState;
 import io.parsingdata.metal.encoding.Encoding;
 
@@ -42,7 +39,7 @@ import io.parsingdata.metal.encoding.Encoding;
  * {@link SingleValueExpression}). First <code>initial</code> is evaluated. If it
  * does not return a valid value, the final result is an empty list. Next,
  * <code>values</code> is evaluated and its result is passed to the abstract
- * {@link #prepareValues(ImmutableList)} method. The returned list is prefixed
+ * {@link #prepareValues(List)} method. The returned list is prefixed
  * by the value returned by evaluating <code>initial</code>. On this list, the
  * <code>reducer</code> is applied to the first two values until a single
  * value remains, which is then returned.
@@ -65,38 +62,23 @@ public abstract class Fold extends ImmutableObject implements SingleValueExpress
         if (initialValue.isPresent() && initialValue.get().equals(NOT_A_VALUE)) {
             return initialValue;
         }
-        final ImmutableList<Value> unpreparedValues = this.values.eval(parseState, encoding);
+        final List<Value> unpreparedValues = this.values.eval(parseState, encoding);
         if (unpreparedValues.isEmpty()) {
             return initialValue;
         }
-        if (containsNotAValue(unpreparedValues).computeResult()) {
+        if (unpreparedValues.contains(NOT_A_VALUE)) {
             return Optional.of(NOT_A_VALUE);
         }
-        final ImmutableList<Value> valueList = initialValue.map(value -> prepareValues(unpreparedValues).add(value))
-            .orElseGet(() -> prepareValues(unpreparedValues));
-        return Optional.of(fold(parseState, encoding, reducer, valueList.head, valueList.tail).computeResult());
+        final List<Value> valueList = prepareValues(unpreparedValues);
+        Value result = initialValue.orElse(valueList.get(0));
+        for (int i = initialValue.isPresent() ? 0 : 1; i < valueList.size() && !result.equals(NOT_A_VALUE); i++) {
+            result = reduce(reducer, result, valueList.get(i)).evalSingle(parseState, encoding)
+                .orElseThrow(() -> new IllegalArgumentException("Reducer must evaluate to a value."));
+        }
+        return Optional.of(result);
     }
 
-    private Trampoline<Value> fold(final ParseState parseState, final Encoding encoding, final BinaryOperator<SingleValueExpression> reducer, final Value head, final ImmutableList<Value> tail) {
-        if (head.equals(NOT_A_VALUE) || tail.isEmpty()) {
-            return complete(() -> head);
-        }
-        return reduce(reducer, head, tail.head).evalSingle(parseState, encoding)
-            .map(reducedValue -> intermediate(() -> fold(parseState, encoding, reducer, reducedValue, tail.tail)))
-            .orElseThrow(() -> new IllegalArgumentException("Reducer must evaluate to a value."));
-    }
-
-    private Trampoline<Boolean> containsNotAValue(final ImmutableList<Value> list) {
-        if (list.isEmpty()) {
-            return complete(() -> false);
-        }
-        if (list.head.equals(NOT_A_VALUE)) {
-            return complete(() -> true);
-        }
-        return intermediate(() -> containsNotAValue(list.tail));
-    }
-
-    protected abstract ImmutableList<Value> prepareValues(ImmutableList<Value> valueList);
+    protected abstract List<Value> prepareValues(List<Value> valueList);
 
     protected abstract SingleValueExpression reduce(BinaryOperator<SingleValueExpression> reducer, Value head, Value tail);
 

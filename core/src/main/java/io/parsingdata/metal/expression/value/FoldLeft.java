@@ -18,11 +18,11 @@
 package io.parsingdata.metal.expression.value;
 
 import static io.parsingdata.metal.Shorthand.con;
-import static io.parsingdata.metal.data.Selection.reverse;
+import static io.parsingdata.metal.Util.reverse;
 
+import java.util.List;
 import java.util.function.BinaryOperator;
 
-import io.parsingdata.metal.data.ImmutableList;
 
 /**
  * A {@link SingleValueExpression} implementation of the FoldLeft operation.
@@ -39,7 +39,7 @@ public class FoldLeft extends Fold {
     }
 
     @Override
-    protected ImmutableList<Value> prepareValues(final ImmutableList<Value> valueList) {
+    protected List<Value> prepareValues(final List<Value> valueList) {
         return reverse(valueList);
     }
 
